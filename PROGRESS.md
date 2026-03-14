@@ -53,3 +53,8 @@
 | Architecture | `.planning/docs/architecture.md` |
 | Roadmap | `.planning/docs/roadmap.md` |
 | Planning index | `.planning/INDEX.md` |
+
+## Setup
+
+- Always run in linux env or wsl.
+- Always use uv for python package management.
