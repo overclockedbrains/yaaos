@@ -103,6 +103,40 @@ def test_dot_dirs_not_in_ignorelist_are_allowed(tmp_path: Path):
     assert filter.is_dir_allowed(planning_dir) is True
 
 
+def test_generated_and_lock_files_are_skipped(tmp_path: Path):
+    """Minified JS, bundle files, and lock files should be skipped."""
+    filter = FileFilter(tmp_path, [".js", ".css", ".json", ".yaml"], max_file_size_mb=10)
+
+    # Minified JS — has .js extension but should be skipped
+    f1 = tmp_path / "vendor.min.js"
+    f1.write_text("minified code")
+    assert filter.should_index(f1, file_size=13) is False
+
+    # Minified CSS
+    f2 = tmp_path / "styles.min.css"
+    f2.write_text("minified css")
+    assert filter.should_index(f2, file_size=12) is False
+
+    # Bundle file
+    f3 = tmp_path / "app.bundle.js"
+    f3.write_text("bundled")
+    assert filter.should_index(f3, file_size=7) is False
+
+    # Lock files
+    f4 = tmp_path / "package-lock.json"
+    f4.write_text("{}")
+    assert filter.should_index(f4, file_size=2) is False
+
+    f5 = tmp_path / "yarn.lock"
+    f5.write_text("lock")
+    assert filter.should_index(f5, file_size=4) is False
+
+    # Normal JS should still be allowed
+    f6 = tmp_path / "app.js"
+    f6.write_text("code")
+    assert filter.should_index(f6, file_size=4) is True
+
+
 def test_hidden_files_are_skipped(tmp_path: Path):
     filter = FileFilter(tmp_path, [".py", ".env"], max_file_size_mb=10)
 

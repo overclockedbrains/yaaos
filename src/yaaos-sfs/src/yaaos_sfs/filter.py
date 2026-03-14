@@ -20,6 +20,7 @@ GLOBAL_IGNORED_DIRS = {
     ".svn",
     "node_modules",
     "venv",
+    ".venv",
     "vendor",
     "dist",
     "build",
@@ -34,6 +35,30 @@ GLOBAL_IGNORED_DIRS = {
     ".idea",
     ".vscode",
     ".vs",
+    ".next",
+    ".nuxt",
+}
+
+# Generated/minified files — skip even if extension matches
+GENERATED_FILE_PATTERNS = {
+    ".min.js",
+    ".min.css",
+    ".min.mjs",
+    ".bundle.js",
+    ".chunk.js",
+}
+
+# Lock files — skip even if extension matches
+LOCK_FILES = {
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Pipfile.lock",
+    "poetry.lock",
+    "composer.lock",
+    "Gemfile.lock",
+    "Cargo.lock",
+    "uv.lock",
 }
 
 
@@ -113,7 +138,15 @@ class FileFilter:
             except ValueError:
                 pass  # Not in watch_dir
 
-        # 3. Extension whitelist Layer
+        # 3a. Generated/minified file check
+        name_lower = path.name.lower()
+        if name_lower in LOCK_FILES:
+            return False
+        for pattern in GENERATED_FILE_PATTERNS:
+            if name_lower.endswith(pattern):
+                return False
+
+        # 3b. Extension whitelist Layer
         if path.suffix.lower() not in self.supported_extensions:
             return False
 
