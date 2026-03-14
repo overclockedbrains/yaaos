@@ -8,6 +8,7 @@ import struct
 from datetime import datetime, timezone
 from pathlib import Path
 
+import xxhash
 import sqlite_vec
 
 
@@ -42,10 +43,20 @@ class Database:
                 extension TEXT,
                 size_bytes INTEGER,
                 modified_at TEXT,
+                mtime_ns INTEGER,
                 indexed_at TEXT,
                 content_hash TEXT,
                 chunk_count INTEGER DEFAULT 0
             );
+        """)
+        
+        # Safely migrate existing databases to add mtime_ns
+        try:
+            self.conn.execute("ALTER TABLE files ADD COLUMN mtime_ns INTEGER")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+            
+        self.conn.executescript(f"""
 
             CREATE TABLE IF NOT EXISTS chunks (
                 id INTEGER PRIMARY KEY,
@@ -80,14 +91,26 @@ class Database:
         self.conn.commit()
 
     def file_needs_indexing(self, path: Path) -> bool:
-        """Check if file needs (re)indexing by comparing content hash."""
-        content_hash = self._hash_file(path)
+        """Check if file needs (re)indexing using stat-first, falling back to xxHash128."""
+        try:
+            stat = path.stat()
+            current_mtime_ns = stat.st_mtime_ns
+            current_size = stat.st_size
+        except OSError:
+            return True
+
         row = self.conn.execute(
-            "SELECT content_hash FROM files WHERE path = ?", (str(path),)
+            "SELECT mtime_ns, size_bytes, content_hash FROM files WHERE path = ?", (str(path),)
         ).fetchone()
+        
         if row is None:
             return True
-        return row["content_hash"] != content_hash
+
+        if row["mtime_ns"] == current_mtime_ns and row["size_bytes"] == current_size:
+            return False
+
+        current_hash = self._xxhash_file(path)
+        return row["content_hash"] != current_hash
 
     def upsert_file(
         self,
@@ -97,11 +120,14 @@ class Database:
     ):
         """Insert or update a file with its chunks and embeddings."""
         stat = path.stat()
-        content_hash = self._hash_file(path)
+        mtime_ns = stat.st_mtime_ns
+        content_hash = self._xxhash_file(path)
         now = datetime.now(timezone.utc).isoformat()
 
         # Delete old data if exists
-        old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
+        old = self.conn.execute(
+            "SELECT id FROM files WHERE path = ?", (str(path),)
+        ).fetchone()
         if old:
             file_id = old["id"]
             # Get old chunk IDs to remove from vec table
@@ -109,37 +135,29 @@ class Database:
                 "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
             ).fetchall()
             for chunk in old_chunks:
-                self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
+                self.conn.execute(
+                    "DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],)
+                )
             self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
             self.conn.execute(
-                """UPDATE files SET filename=?, extension=?, size_bytes=?,
+                """UPDATE files SET filename=?, extension=?, size_bytes=?, mtime_ns=?,
                    modified_at=?, indexed_at=?, content_hash=?, chunk_count=?
                    WHERE id=?""",
                 (
-                    path.name,
-                    path.suffix,
-                    stat.st_size,
+                    path.name, path.suffix, stat.st_size, mtime_ns,
                     datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                    now,
-                    content_hash,
-                    len(chunks),
-                    file_id,
+                    now, content_hash, len(chunks), file_id,
                 ),
             )
         else:
             cursor = self.conn.execute(
-                """INSERT INTO files (path, filename, extension, size_bytes,
+                """INSERT INTO files (path, filename, extension, size_bytes, mtime_ns,
                    modified_at, indexed_at, content_hash, chunk_count)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    str(path),
-                    path.name,
-                    path.suffix,
-                    stat.st_size,
+                    str(path), path.name, path.suffix, stat.st_size, mtime_ns,
                     datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                    now,
-                    content_hash,
-                    len(chunks),
+                    now, content_hash, len(chunks),
                 ),
             )
             file_id = cursor.lastrowid
@@ -161,19 +179,25 @@ class Database:
 
     def remove_file(self, path: Path):
         """Remove a file and all its chunks from the index."""
-        old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
+        old = self.conn.execute(
+            "SELECT id FROM files WHERE path = ?", (str(path),)
+        ).fetchone()
         if old:
             file_id = old["id"]
             old_chunks = self.conn.execute(
                 "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
             ).fetchall()
             for chunk in old_chunks:
-                self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
+                self.conn.execute(
+                    "DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],)
+                )
             self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
             self.conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
             self.conn.commit()
 
-    def search_vector(self, query_embedding: list[float], top_k: int = 20) -> list[dict]:
+    def search_vector(
+        self, query_embedding: list[float], top_k: int = 20
+    ) -> list[dict]:
         """Search by vector similarity."""
         rows = self.conn.execute(
             """
@@ -226,9 +250,9 @@ class Database:
         self.conn.close()
 
     @staticmethod
-    def _hash_file(path: Path) -> str:
-        h = hashlib.sha256()
+    def _xxhash_file(path: Path) -> str:
+        h = xxhash.xxh128()
         with open(path, "rb") as f:
-            for block in iter(lambda: f.read(8192), b""):
+            for block in iter(lambda: f.read(81920), b""):
                 h.update(block)
         return h.hexdigest()

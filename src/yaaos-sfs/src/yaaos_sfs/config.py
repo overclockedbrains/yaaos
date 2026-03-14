@@ -26,37 +26,20 @@ class Config:
     embedding_dims: int = 384
     chunk_size: int = 512
     chunk_overlap: int = 50
-    supported_extensions: list[str] = field(
-        default_factory=lambda: [
-            ".txt",
-            ".md",
-            ".py",
-            ".js",
-            ".ts",
-            ".jsx",
-            ".tsx",
-            ".json",
-            ".yaml",
-            ".yml",
-            ".toml",
-            ".sh",
-            ".bash",
-            ".zsh",
-            ".rs",
-            ".go",
-            ".c",
-            ".h",
-            ".cpp",
-            ".hpp",
-            ".java",
-            ".rb",
-            ".php",
-            ".css",
-            ".html",
-            ".xml",
-            ".pdf",
-        ]
-    )
+    supported_extensions: list[str] = field(default_factory=lambda: [
+        ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
+        ".json", ".yaml", ".yml", ".toml",
+        ".sh", ".bash", ".zsh",
+        ".rs", ".go", ".c", ".h", ".cpp", ".hpp",
+        ".java", ".rb", ".php",
+        ".css", ".html", ".xml",
+        ".pdf",
+    ])
+    
+    # SFS v2 new settings
+    batch_size: int = 50
+    debounce_ms: int = 1500
+    max_file_size_mb: float = 5.0
 
     # OpenAI settings (optional)
     openai_api_key: str | None = None
@@ -82,6 +65,12 @@ class Config:
                 config.chunk_overlap = sfs["chunk_overlap"]
             if "extensions" in sfs:
                 config.supported_extensions = sfs["extensions"]
+            if "batch_size" in sfs:
+                config.batch_size = sfs["batch_size"]
+            if "debounce_ms" in sfs:
+                config.debounce_ms = sfs["debounce_ms"]
+            if "max_file_size_mb" in sfs:
+                config.max_file_size_mb = sfs["max_file_size_mb"]
 
             embedding = data.get("embedding", {})
             if "provider" in embedding:
