@@ -53,7 +53,8 @@ if _src.exists() and str(_src) not in sys.path:
 try:
     from yaaos_sfs.config import Config
     from yaaos_sfs.db import Database
-    from yaaos_sfs.indexer import extract_text, chunk_text
+    from yaaos_sfs.extractors import extract_text
+    from yaaos_sfs.chunkers import chunk_text
     from yaaos_sfs.filter import FileFilter
     from yaaos_sfs.providers.local import LocalEmbeddingProvider
 
@@ -216,7 +217,7 @@ def run_indexing(
             text = extract_text(path)
             if not text or not text.strip():
                 return "failed", None, path
-            chunks = chunk_text(text, config.chunk_size, config.chunk_overlap)
+            chunks = chunk_text(text, chunk_size=config.chunk_size, chunk_overlap=config.chunk_overlap)
             if not chunks:
                 return "failed", None, path
             return "ok", chunks, path

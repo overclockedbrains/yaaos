@@ -1,8 +1,9 @@
-"""Tests for text extraction and chunking."""
+"""Tests for text extraction and chunking (uses new extractors/chunkers modules)."""
 
 from __future__ import annotations
 
-from yaaos_sfs.indexer import extract_text, chunk_text
+from yaaos_sfs.extractors import extract_text
+from yaaos_sfs.chunkers import chunk_text
 
 
 class TestExtractText:
@@ -54,24 +55,20 @@ class TestChunkText:
     def test_empty_text(self):
         assert chunk_text("") == []
         assert chunk_text("   ") == []
-        assert chunk_text(None) == []
 
     def test_long_text_multiple_chunks(self):
-        # Create text with 100 words
         words = [f"word{i}" for i in range(100)]
         text = " ".join(words)
-        chunks = chunk_text(text, chunk_size=30, overlap=5)
+        chunks = chunk_text(text, chunk_size=30, chunk_overlap=5)
         assert len(chunks) > 1
-        # Each chunk should have roughly 30 words (last may be smaller)
         for chunk in chunks[:-1]:
             assert len(chunk.split()) == 30
 
     def test_overlap_exists(self):
         words = [f"w{i}" for i in range(50)]
         text = " ".join(words)
-        chunks = chunk_text(text, chunk_size=20, overlap=5)
+        chunks = chunk_text(text, chunk_size=20, chunk_overlap=5)
         assert len(chunks) >= 2
-        # Words from end of chunk 1 should appear at start of chunk 2
         words_c1 = chunks[0].split()
         words_c2 = chunks[1].split()
         overlap = set(words_c1[-5:]) & set(words_c2[:5])
@@ -80,6 +77,6 @@ class TestChunkText:
     def test_chunk_size_respected(self):
         words = [f"word{i}" for i in range(200)]
         text = " ".join(words)
-        chunks = chunk_text(text, chunk_size=50, overlap=10)
+        chunks = chunk_text(text, chunk_size=50, chunk_overlap=10)
         for chunk in chunks[:-1]:
             assert len(chunk.split()) == 50

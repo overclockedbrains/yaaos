@@ -6,7 +6,8 @@ import pytest
 
 from yaaos_sfs.config import Config
 from yaaos_sfs.db import Database
-from yaaos_sfs.indexer import extract_text, chunk_text
+from yaaos_sfs.extractors import extract_text
+from yaaos_sfs.chunkers import chunk_text
 from yaaos_sfs.providers.local import LocalEmbeddingProvider
 from yaaos_sfs.search import hybrid_search
 
@@ -68,7 +69,7 @@ def _index_file(db, provider, path, config):
     text = extract_text(path)
     if not text or not text.strip():
         return
-    chunks = chunk_text(text, config.chunk_size, config.chunk_overlap)
+    chunks = chunk_text(text, chunk_size=config.chunk_size, chunk_overlap=config.chunk_overlap)
     if not chunks:
         return
     embeddings = provider.embed(chunks)

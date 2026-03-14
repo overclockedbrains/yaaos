@@ -1,0 +1,70 @@
+# Default ignore patterns for YAAOS SFS
+# Copy to your watch directory as .sfsignore to customize
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+vendor/
+bower_components/
+
+# Build artifacts
+dist/
+build/
+out/
+target/
+bin/
+obj/
+*.min.js
+*.min.css
+*.map
+*.bundle.js
+
+# Package lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+Pipfile.lock
+poetry.lock
+Cargo.lock
+composer.lock
+Gemfile.lock
+
+# Generated files
+*.pyc
+*.pyo
+__pycache__/
+*.class
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# IDE & editor
+.idea/
+.vscode/
+.vs/
+*.swp
+*.swo
+*~
+
+# Version control
+.git/
+.hg/
+.svn/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.eslintcache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/

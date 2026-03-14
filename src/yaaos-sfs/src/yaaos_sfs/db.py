@@ -251,7 +251,7 @@ class Database:
                 """
                 SELECT v.id, v.distance,
                        c.chunk_text, c.chunk_index, c.file_id,
-                       f.path, f.filename
+                       f.path, f.filename, f.extension, f.modified_at
                 FROM chunks_vec v
                 JOIN chunks c ON c.id = v.id
                 JOIN files f ON f.id = c.file_id
@@ -272,7 +272,7 @@ class Database:
                 """
                 SELECT c.id, rank AS score,
                        c.chunk_text, c.chunk_index, c.file_id,
-                       f.path, f.filename
+                       f.path, f.filename, f.extension, f.modified_at
                 FROM chunks_fts fts
                 JOIN chunks c ON c.id = fts.rowid
                 JOIN files f ON f.id = c.file_id
@@ -295,6 +295,14 @@ class Database:
             "chunks": chunks,
             "db_size_mb": round(db_size / (1024 * 1024), 1),
         }
+
+    def get_stats_by_type(self) -> dict[str, int]:
+        """Get file count per extension (e.g. {'.py': 45, '.md': 23})."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT extension, COUNT(*) as n FROM files GROUP BY extension ORDER BY n DESC"
+            ).fetchall()
+        return {r["extension"]: r["n"] for r in rows if r["extension"]}
 
     def close(self):
         with self._lock:

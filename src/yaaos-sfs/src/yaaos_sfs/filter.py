@@ -2,7 +2,7 @@
 filter.py — 4-layer file filtering pipeline for YAAOS SFS (v2).
 Implements the following layers to aggressively discard non-indexable files:
 1. Hardcoded Ignore Layer: extremely common noise dirs (node_modules, .git, dist)
-2. Pathspec (.gitignore) Layer: parses user .gitignore patterns
+2. Pathspec (.gitignore + .sfsignore) Layer: parses user ignore patterns
 3. Extension whitelist Layer: from config.supported_extensions
 4. Size limit Layer: ignores files > config.max_file_size_mb
 """
@@ -44,18 +44,20 @@ class FileFilter:
         self.max_file_size_bytes = int(max_file_size_mb * 1024 * 1024)
 
         self._gitignore_spec: pathspec.PathSpec | None = None
-        self._load_gitignore()
+        self._load_ignore_patterns()
 
-    def _load_gitignore(self) -> None:
-        """Load .gitignore if it exists in the root of the watch directory."""
-        gitignore_path = self.watch_dir / ".gitignore"
+    def _load_ignore_patterns(self) -> None:
+        """Load .gitignore and .sfsignore if they exist in the watch directory."""
         lines = []
-        if gitignore_path.is_file():
-            try:
-                with open(gitignore_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-            except IOError:
-                pass
+
+        for ignore_file in (".gitignore", ".sfsignore"):
+            ignore_path = self.watch_dir / ignore_file
+            if ignore_path.is_file():
+                try:
+                    with open(ignore_path, "r", encoding="utf-8") as f:
+                        lines.extend(f.readlines())
+                except IOError:
+                    pass
 
         # Always add our global defaults to the pathspec to be extra safe
         lines.extend([f"**/{d}/" for d in GLOBAL_IGNORED_DIRS])
@@ -68,7 +70,7 @@ class FileFilter:
         Returns False if the directory should be completely skipped.
         """
         # 1. Hardcoded check first (fastest)
-        if dir_path.name in GLOBAL_IGNORED_DIRS or dir_path.name.startswith("."):
+        if dir_path.name in GLOBAL_IGNORED_DIRS:
             return False
 
         # 2. .gitignore check
@@ -98,7 +100,7 @@ class FileFilter:
         # 1. Check parent directories against hardcoded ignores (if not already filtered by walker)
         # Note: Depending on walker, this might be redundant, but safe.
         for part in path.parts:
-            if part in GLOBAL_IGNORED_DIRS or (part.startswith(".") and part not in (".", "..")):
+            if part in GLOBAL_IGNORED_DIRS:
                 return False
 
         # 2. Pathspec (.gitignore) Layer

@@ -1,98 +1,132 @@
-# YAAOS Semantic File System (v2)
+# YAAOS Semantic File System (SFS) v2
 
-The **YAAOS Semantic File System (SFS)** is a powerful background daemon and CLI toolkit designed to semantically index and search your local files. Instead of searching by filename or exact keywords, SFS lets you search your workspace "by meaning" using advanced local or cloud-based embedding models.
+The **YAAOS Semantic File System (SFS)** is a background daemon and CLI toolkit that lets you search your local files **by meaning**, not just by filename or exact keywords. SFS v2 handles real-world workspaces (22GB+ dev folders) with multi-format support, smart chunking, and swappable embedding providers.
 
-SFS v2 features an ultra-fast watcher, chunking logic, an embedded light vector database (`sqlite-vec`), and extremely aggressive 4-layer file filtering to ensure maximum efficiency.
+For the full architecture breakdown, read the [Architecture Guide](ARCHITECTURE.md).
 
-👉 **Confused about what runs where?** Read the [Architecture & Flow Guide](ARCHITECTURE.md) for a crystal-clear breakdown.
+## What's New in v2
 
-## 📋 Prerequisites
+- **65+ file types** -- code, documents (PDF, DOCX, XLSX, EPUB), and media metadata (EXIF, ID3)
+- **Smart chunking** -- tree-sitter AST chunking for code, heading-aware chunking for prose, key-value extraction for JSON/YAML/CSV
+- **3-signal hybrid search** -- vector similarity + keyword matching + path matching, fused with RRF
+- **Stat-first change detection** -- xxHash128 instead of SHA-256 (60-100x faster)
+- **4-layer file filtering** -- .gitignore + .sfsignore + hardcoded noise dirs + size limits
+- **Swappable providers** -- local (default), OpenAI, Voyage AI, Ollama
+- **Batch embedding + debouncing** -- efficient handling of bulk file changes
 
-To run this project optimally, the following stack is required:
+## Prerequisites
 
-1. **Windows Subsystem for Linux (WSL)**
-   SFS runs best inside a Linux environment like WSL on Windows. All terminal commands must be run from an active WSL session (e.g., Ubuntu).
-2. **`uv` - Python Package Manager**
-   We use `uv`, an extremely fast Python package manager written in Rust.
-   *Install `uv` (WSL/Linux):* `curl -LsSf https://astral.sh/uv/install.sh | sh`
-3. **Python 3.12+**
-   `uv` will automatically manage Python versions for you.
-
-## 🚀 Installation & Setup
-
-1. **Open your WSL terminal** and navigate to the SFS directory:
+1. **WSL (Windows)** -- SFS runs best inside Linux/WSL. All commands below assume a Linux shell.
+2. **`uv`** -- Fast Python package manager written in Rust.
    ```bash
-   cd /mnt/c/Aman/Coding-Bamzii/yaaos/src/yaaos-sfs
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
+3. **Python 3.12+** -- `uv` manages this automatically.
 
-2. **Sync Dependencies**:
-   `uv` will create the virtual environment (`.venv`) and install all lockfile dependencies incredibly fast.
-   ```bash
-   uv sync
-   ```
+## Installation
 
-## ⚙️ Configuration
-
-SFS behaviour is driven by configuration variables. Some common features to tune:
-
-- **Directory to Watch:** The root of the repository you are indexing.
-- **Embedding Provider:** `local` (SentenceTransformers, runs on CPU/GPU locally) or `openai` (Requires `OPENAI_API_KEY`).
-- **File Limits:** Set `max_file_size_mb` (default is usually 5MB).
-
-You can pass environment variables or define them where `config.py` specifies. By default, it aggressively ignores noise like `node_modules`, `.git`, `.venv`, and respects your local `.gitignore`.
-
-## 🧪 Running Tests & Linting
-
-Before pushing code or after making modifications, ensure you run the comprehensive test suite to keep the CI green!
-
-**1. Fast Format & Lint:**
 ```bash
-# Check code style and format
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
+cd /mnt/c/Aman/Coding-Bamzii/yaaos/src/yaaos-sfs
 
-# Auto-fix fixable issues
-uv run ruff check --fix src/ tests/
-uv run ruff format src/ tests/
+# Core install
+uv sync
+
+# Optional: document extraction (DOCX, PPTX, XLSX, EPUB, RTF)
+uv sync --extra docs
+
+# Optional: media metadata (image EXIF, audio ID3, video tags)
+uv sync --extra media
+
+# Optional: tree-sitter AST chunking for code
+uv sync --extra code
+
+# Everything
+uv sync --extra all
 ```
 
-**2. Fast Tests (Logic & Mocks - Extremely Fast):**
-```bash
-uv run pytest tests/ -v --ignore=tests/test_providers.py --ignore=tests/test_integration.py --ignore=tests/stress -x
+## Configuration
+
+SFS reads from `~/.config/yaaos/config.toml`:
+
+```toml
+[sfs]
+watch_dir = "~/projects"           # Directory to watch
+db_path = "~/.local/share/yaaos/sfs.db"
+max_file_size_mb = 5.0             # Skip files larger than this
+batch_size = 50                    # Chunks per embedding batch
+debounce_ms = 1500                 # Event debounce window
+rescan_interval_min = 10           # Periodic re-scan interval
+query_port = 9749                  # TCP query server port
+
+[embedding]
+provider = "local"                 # "local", "openai", "voyage", "ollama"
+model = "all-MiniLM-L6-v2"
+
+[providers.openai]
+api_key_env = "OPENAI_API_KEY"
+
+[providers.voyage]
+api_key_env = "VOYAGE_API_KEY"
+
+[providers.ollama]
+base_url = "http://localhost:11434"
+model = "nomic-embed-text"
 ```
 
-**3. Full Integration Tests (Heavy - Loads Models):**
-```bash
-uv run pytest tests/ -v --ignore=tests/stress
-```
+Custom ignore patterns: create `.sfsignore` in your watch directory (same syntax as `.gitignore`). See [.sfsignore.default](.sfsignore.default) for the shipped defaults.
 
-## 🏃‍♂️ Upping It (Running the Daemon)
-
-To start the SFS background daemon that will actively watch your files, chunk changes, get embeddings, and upsert them to SQLite:
+## Running the Daemon
 
 ```bash
 uv run yaaos-sfs
 ```
 
-**What happens?**
-1. **Query Server:** A TCP query server starts on `localhost:9749`, ready to serve instant searches from the CLI.
-2. **Initial Scan:** SFS heavily filters your tree, finds allowed files, and compares them with the SQLite DB. Missing/outdated files are batched and embedded.
-3. **Watchdog Active:** The daemon continuously listens to file creations, saves, and deletions. Uses a debouncer (e.g. 1500ms) so wildly hitting `Ctrl+S` doesn't saturate the indexer.
-4. **Periodic Re-scan:** Every 10 minutes (configurable via `rescan_interval_min`), the daemon re-scans the directory to catch files the OS watcher may have missed (e.g. bulk copies, network drive syncs, or OS event buffer overflows).
-5. *Press `Ctrl+C` to elegantly spin down the daemon and close the DB.*
+This will:
+1. Start the TCP query server on `localhost:9749`
+2. Run an initial scan with 4-layer filtering
+3. Index new/changed files with batch embedding + tqdm progress bar
+4. Watch for file changes with debouncing
+5. Periodically re-scan every 10 minutes
 
-## 🔍 Searching (Instant via Daemon)
+Press `Ctrl+C` to shut down gracefully.
 
-SFS provides a command-line utility to query your indexed semantic filesystem:
+## Searching
 
 ```bash
-# Instant search — routes through the running daemon (no model loading)
-uv run yaaos-find "How does the file filter pipeline work?"
+# Semantic search (instant via daemon)
+uv run yaaos-find "How does the file filter work?"
 
-# Check daemon and index status
+# Filter by file type (comma-separated)
+uv run yaaos-find "quarterly report" --type pdf,docx
+
+# More results
+uv run yaaos-find "database helpers" --top 20
+
+# Check index status and per-type breakdown
 uv run yaaos-find --status
 ```
 
-When the daemon is running, queries are **instant** — the CLI sends your query over TCP to the daemon, which already has the embedding model in memory. No model loading overhead.
+When the daemon is running, queries are **instant** (~50ms). If the daemon is down, the CLI falls back to loading the model locally (~2s first query).
 
-If the daemon is not running, the CLI gracefully falls back to loading the model directly (slower first query, same results).
+## Tests & Linting
+
+```bash
+# Lint
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+
+# Fast unit tests (no model loading)
+uv run pytest tests/ -v --ignore=tests/test_integration.py --ignore=tests/stress_test.py -x
+
+# Full integration tests (loads embedding model)
+uv run pytest tests/ -v --ignore=tests/stress_test.py
+```
+
+## Provider Options
+
+| Provider | Install | Best For |
+|----------|---------|----------|
+| **local** (default) | included | General use, offline, no API keys |
+| **openai** | `uv sync --extra openai` | High-quality general embeddings |
+| **voyage** | `uv sync --extra voyage` | Best-in-class code search |
+| **ollama** | Ollama server running | Local models, any Ollama model |

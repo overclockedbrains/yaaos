@@ -76,6 +76,8 @@ class DaemonClient:
                 chunk_text=r["chunk_text"],
                 chunk_index=r["chunk_index"],
                 score=r["score"],
+                file_type=r.get("file_type", ""),
+                modified_at=r.get("modified_at", ""),
             )
             for r in resp["results"]
         ]

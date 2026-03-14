@@ -35,7 +35,8 @@ except ImportError:
 from .config import Config
 from .db import Database
 from .filter import FileFilter
-from .indexer import extract_text, chunk_text
+from .extractors import extract_text
+from .chunkers import chunk_text
 from .providers import EmbeddingProvider
 from .providers.local import LocalEmbeddingProvider
 from .server import QueryServer
@@ -100,7 +101,11 @@ class SFSHandler(FileSystemEventHandler):
                 if not text or not text.strip():
                     continue
 
-                chunks = chunk_text(text, self.config.chunk_size, self.config.chunk_overlap)
+                chunks = chunk_text(
+                    text, path=path,
+                    chunk_size=self.config.chunk_size,
+                    chunk_overlap=self.config.chunk_overlap,
+                )
                 if not chunks:
                     continue
 
@@ -211,7 +216,11 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config, quiet: b
             text = extract_text(path)
             if not text or not text.strip():
                 return None
-            chunks = chunk_text(text, config.chunk_size, config.chunk_overlap)
+            chunks = chunk_text(
+                text, path=path,
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
             if not chunks:
                 return None
             return (path, chunks)
@@ -252,20 +261,34 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config, quiet: b
 
 
 def _get_provider(config: Config) -> EmbeddingProvider:
-    if config.embedding_provider == "openai":
+    provider = config.embedding_provider
+
+    if provider == "openai":
         from .providers.openai_provider import OpenAIEmbeddingProvider
 
         if not config.openai_api_key:
             log.error("OpenAI provider selected but no API key configured.")
             sys.exit(1)
         return OpenAIEmbeddingProvider(config.openai_api_key, config.openai_model)
-    return LocalEmbeddingProvider(config.embedding_model)
+
+    if provider == "voyage":
+        from .providers.voyage_provider import VoyageEmbeddingProvider
+
+        return VoyageEmbeddingProvider(config.voyage_api_key, config.voyage_model)
+
+    if provider == "ollama":
+        from .providers.ollama_provider import OllamaEmbeddingProvider
+
+        return OllamaEmbeddingProvider(config.ollama_model, config.ollama_base_url)
+
+    # Default: local sentence-transformers (with GPU auto-detection)
+    return LocalEmbeddingProvider(config.embedding_model, device=config.device)
 
 
 def main():
     """Entry point for the yaaos-sfs daemon."""
     config = Config.load()
-    log.info("YAAOS Semantic File System v0.1.0")
+    log.info("YAAOS Semantic File System v0.2.0")
     log.info(f"Watching: {config.watch_dir}")
     log.info(f"Database: {config.db_path}")
     log.info(f"Provider: {config.embedding_provider} ({config.embedding_model})")

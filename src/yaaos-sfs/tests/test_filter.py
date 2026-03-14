@@ -69,6 +69,40 @@ def test_file_size_limit_works(tmp_path: Path):
     assert filter.should_index(f3, file_size=0) is False
 
 
+def test_sfsignore_patterns_are_respected(tmp_path: Path):
+    sfsignore = tmp_path / ".sfsignore"
+    sfsignore.write_text("*.generated.py\nsecrets/\n")
+
+    filter = FileFilter(tmp_path, [".py", ".txt"], max_file_size_mb=10)
+
+    f1 = tmp_path / "output.generated.py"
+    f1.write_text("generated code")
+    assert filter.should_index(f1, file_size=14) is False
+
+    # Normal file should still be allowed
+    f2 = tmp_path / "main.py"
+    f2.write_text("code")
+    assert filter.should_index(f2, file_size=4) is True
+
+    # secrets directory
+    d = tmp_path / "secrets"
+    d.mkdir()
+    assert filter.is_dir_allowed(d) is False
+
+
+def test_dot_dirs_not_in_ignorelist_are_allowed(tmp_path: Path):
+    """Directories like .github or .planning should NOT be skipped."""
+    filter = FileFilter(tmp_path, [".py", ".md"], max_file_size_mb=10)
+
+    github_dir = tmp_path / ".github"
+    github_dir.mkdir()
+    assert filter.is_dir_allowed(github_dir) is True
+
+    planning_dir = tmp_path / ".planning"
+    planning_dir.mkdir()
+    assert filter.is_dir_allowed(planning_dir) is True
+
+
 def test_hidden_files_are_skipped(tmp_path: Path):
     filter = FileFilter(tmp_path, [".py", ".env"], max_file_size_mb=10)
 

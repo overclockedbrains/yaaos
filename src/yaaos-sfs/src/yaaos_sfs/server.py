@@ -105,11 +105,13 @@ class QueryServer(socketserver.ThreadingTCPServer):
 
     def _handle_status(self) -> dict:
         stats = self.db.get_stats()
+        type_breakdown = self.db.get_stats_by_type()
         return {
             "stats": stats,
             "watch_dir": str(self.config.watch_dir),
             "provider": self.config.embedding_provider,
             "model": self.config.embedding_model,
+            "type_breakdown": type_breakdown,
         }
 
     def start_background(self) -> threading.Thread:

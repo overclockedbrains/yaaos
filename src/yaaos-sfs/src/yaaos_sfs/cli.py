@@ -16,7 +16,7 @@ console = Console()
 @click.group(invoke_without_command=True)
 @click.argument("query", required=False)
 @click.option("--top", "-n", default=10, help="Number of results to show")
-@click.option("--type", "-t", "file_type", default=None, help="Filter by extension (e.g. py, md)")
+@click.option("--type", "-t", "file_type", default=None, help="Filter by extension(s), comma-separated (e.g. py,md,pdf)")
 @click.option("--snippets/--no-snippets", default=True, help="Show text snippets")
 @click.option("--status", is_flag=True, help="Show index status")
 @click.option("--config-path", type=click.Path(), default=None, help="Config file path")
@@ -29,6 +29,8 @@ def main(ctx, query, top, file_type, snippets, status, config_path):
       yaaos-find "notes about the API redesign"
 
       yaaos-find "python database helpers" --type py
+
+      yaaos-find "quarterly report" --type pdf,docx
 
       yaaos-find --status
     """
@@ -51,21 +53,30 @@ def main(ctx, query, top, file_type, snippets, status, config_path):
 def _show_status(config: Config):
     # Try daemon first
     client = DaemonClient(config.query_port)
+    type_breakdown = {}
     try:
         resp = client.status()
         stats = resp["stats"]
         daemon_status = "[bold green]running[/bold green]"
         provider_info = f"{resp['provider']} ({resp['model']})"
         watch_dir = resp["watch_dir"]
+        type_breakdown = resp.get("type_breakdown", {})
     except DaemonNotRunning:
         from .db import Database
 
         db = Database(config.db_path, config.embedding_dims)
         stats = db.get_stats()
+        type_breakdown = db.get_stats_by_type()
         db.close()
         daemon_status = "[bold red]not running[/bold red]"
         provider_info = f"{config.embedding_provider} ({config.embedding_model})"
         watch_dir = str(config.watch_dir)
+
+    # Format per-type breakdown
+    type_line = ""
+    if type_breakdown:
+        parts = [f"{count} {ext}" for ext, count in sorted(type_breakdown.items(), key=lambda x: -x[1])]
+        type_line = f"\n[bold]By type:[/bold] {', '.join(parts)}"
 
     panel = Panel(
         f"[bold]Daemon:[/bold] {daemon_status}\n"
@@ -74,7 +85,7 @@ def _show_status(config: Config):
         f"DB size: {stats['db_size_mb']} MB\n"
         f"[bold]Watch dir:[/bold] {watch_dir}\n"
         f"[bold]Provider:[/bold] {provider_info}\n"
-        f"[bold]Database:[/bold] {config.db_path}",
+        f"[bold]Database:[/bold] {config.db_path}{type_line}",
         title="YAAOS SFS Status",
         border_style="blue",
     )
@@ -91,25 +102,26 @@ def _do_search(config: Config, query: str, top_k: int, file_type: str | None, sh
         # Fallback: load model directly (slow first query)
         console.print("[dim]Daemon not running, loading model locally...[/dim]")
         from .db import Database
-        from .providers.local import LocalEmbeddingProvider
         from .search import hybrid_search
 
-        if config.embedding_provider == "openai":
-            from .providers.openai_provider import OpenAIEmbeddingProvider
-
-            provider = OpenAIEmbeddingProvider(config.openai_api_key, config.openai_model)
-        else:
-            provider = LocalEmbeddingProvider(config.embedding_model)
+        # Use the same provider factory as the daemon
+        from .daemon import _get_provider
+        provider = _get_provider(config)
 
         db = Database(config.db_path, embedding_dims=provider.dims)
         results = hybrid_search(db, provider, query, top_k=top_k)
         db.close()
         source = "local"
 
-    # Filter by type if specified
+    # Filter by type if specified (supports comma-separated: py,md,pdf)
     if file_type:
-        ext = f".{file_type}" if not file_type.startswith(".") else file_type
-        results = [r for r in results if r.file_path.endswith(ext)]
+        exts = set()
+        for t in file_type.split(","):
+            t = t.strip()
+            if t:
+                exts.add(f".{t}" if not t.startswith(".") else t)
+        if exts:
+            results = [r for r in results if any(r.file_path.endswith(ext) for ext in exts)]
 
     if not results:
         console.print(f'[yellow]No results found for:[/yellow] "{query}"')

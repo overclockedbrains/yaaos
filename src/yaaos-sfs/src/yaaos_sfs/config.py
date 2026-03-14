@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    import tomli
-except ImportError:
     import tomllib as tomli  # Python 3.11+ stdlib
+except ImportError:
+    import tomli  # Fallback for older Python
 
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "yaaos" / "config.toml"
@@ -28,33 +28,27 @@ class Config:
     chunk_overlap: int = 50
     supported_extensions: list[str] = field(
         default_factory=lambda: [
-            ".txt",
-            ".md",
-            ".py",
-            ".js",
-            ".ts",
-            ".jsx",
-            ".tsx",
-            ".json",
-            ".yaml",
-            ".yml",
-            ".toml",
-            ".sh",
-            ".bash",
-            ".zsh",
-            ".rs",
-            ".go",
-            ".c",
-            ".h",
-            ".cpp",
-            ".hpp",
-            ".java",
-            ".rb",
-            ".php",
-            ".css",
-            ".html",
-            ".xml",
-            ".pdf",
+            # Code
+            ".py", ".js", ".ts", ".jsx", ".tsx", ".rs", ".go", ".c", ".h",
+            ".cpp", ".hpp", ".cc", ".java", ".rb", ".php", ".swift", ".kt",
+            ".scala", ".cs", ".lua", ".dart",
+            # Shell
+            ".sh", ".bash", ".zsh",
+            # Markup & prose
+            ".md", ".txt", ".rst", ".org", ".tex",
+            # Web
+            ".html", ".htm", ".xml", ".css", ".scss",
+            # Config & data
+            ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".env",
+            ".csv", ".tsv",
+            # Documents (Tier 2)
+            ".pdf", ".docx", ".pptx", ".xlsx", ".epub", ".rtf",
+            # Media metadata (Tier 3)
+            ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp",
+            ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac",
+            ".mp4", ".mkv", ".avi", ".webm", ".mov",
+            # Other
+            ".sql", ".graphql", ".proto",
         ]
     )
 
@@ -68,6 +62,17 @@ class Config:
     # OpenAI settings (optional)
     openai_api_key: str | None = None
     openai_model: str = "text-embedding-3-small"
+
+    # Voyage settings (optional)
+    voyage_api_key: str | None = None
+    voyage_model: str = "voyage-code-3"
+
+    # Device settings (auto-detected if not set)
+    device: str | None = None  # "cuda", "mps", "cpu", or None for auto-detect
+
+    # Ollama settings (optional)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "nomic-embed-text"
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
@@ -107,14 +112,31 @@ class Config:
                 config.embedding_model = embedding["model"]
             if "dims" in embedding:
                 config.embedding_dims = embedding["dims"]
+            if "device" in embedding:
+                config.device = embedding["device"]
 
-            openai = data.get("openai", {})
+            # Provider-specific config sections
+            openai = data.get("providers", {}).get("openai", data.get("openai", {}))
             if "api_key" in openai:
                 config.openai_api_key = openai["api_key"]
             elif "api_key_env" in openai:
                 config.openai_api_key = os.environ.get(openai["api_key_env"])
             if "model" in openai:
                 config.openai_model = openai["model"]
+
+            voyage = data.get("providers", {}).get("voyage", {})
+            if "api_key" in voyage:
+                config.voyage_api_key = voyage["api_key"]
+            elif "api_key_env" in voyage:
+                config.voyage_api_key = os.environ.get(voyage["api_key_env"])
+            if "model" in voyage:
+                config.voyage_model = voyage["model"]
+
+            ollama = data.get("providers", {}).get("ollama", {})
+            if "base_url" in ollama:
+                config.ollama_base_url = ollama["base_url"]
+            if "model" in ollama:
+                config.ollama_model = ollama["model"]
 
         # Ensure directories exist
         config.watch_dir.mkdir(parents=True, exist_ok=True)
