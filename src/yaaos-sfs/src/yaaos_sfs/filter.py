@@ -19,6 +19,7 @@ GLOBAL_IGNORED_DIRS = {
     ".hg",
     ".svn",
     "node_modules",
+    "venv",
     "vendor",
     "dist",
     "build",

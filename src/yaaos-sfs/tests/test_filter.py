@@ -8,7 +8,7 @@ from yaaos_sfs.filter import FileFilter
 
 def test_directory_skip_list(tmp_path: Path):
     filter = FileFilter(tmp_path, [".py"], max_file_size_mb=10)
-    for hidden_dir in [".git", "node_modules", "__pycache__"]:
+    for hidden_dir in [".git", "node_modules", "venv", "__pycache__"]:
         d = tmp_path / hidden_dir
         d.mkdir()
         assert filter.is_dir_allowed(d) is False
