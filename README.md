@@ -26,7 +26,7 @@ Most "AI tools" bolt a chatbot onto existing software. YAAOS builds AI into the 
 ├─────────────────────────────────────────────────┤
 │         Semantic File System — SFS (Done)       │
 │        The memory layer — semantic search,      │
-│        multi-format indexing, GPU-accelerated    │
+│        multi-format indexing, GPU-accelerated   │
 ├─────────────────────────────────────────────────┤
 │           Model Bus (Phase 2 — next)            │
 │        Unified AI runtime, pluggable providers  │
