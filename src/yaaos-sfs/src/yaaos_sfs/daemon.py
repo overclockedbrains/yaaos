@@ -185,7 +185,7 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config, quiet: b
     valid_paths = set(files_to_check)
     db_paths = handler.db.get_all_indexed_paths()
     orphans = db_paths - valid_paths
-    
+
     if orphans:
         log.info(f"Cleaning up {len(orphans)} orphaned/deleted files from index...")
         handler.db.remove_files_batch(list(orphans))

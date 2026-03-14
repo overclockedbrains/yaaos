@@ -128,9 +128,7 @@ class Database:
 
         with self._lock:
             # Delete old data if exists
-            old = self.conn.execute(
-                "SELECT id FROM files WHERE path = ?", (str(path),)
-            ).fetchone()
+            old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
             if old:
                 file_id = old["id"]
                 # Get old chunk IDs to remove from vec table
@@ -193,9 +191,7 @@ class Database:
     def remove_file(self, path: Path):
         """Remove a file and all its chunks from the index."""
         with self._lock:
-            old = self.conn.execute(
-                "SELECT id FROM files WHERE path = ?", (str(path),)
-            ).fetchone()
+            old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
             if old:
                 file_id = old["id"]
                 old_chunks = self.conn.execute(
@@ -223,7 +219,7 @@ class Database:
                 return
 
             ids_placeholders = ",".join(["?"] * len(file_ids))
-            
+
             # Get all chunk IDs for these files
             chunk_rows = self.conn.execute(
                 f"SELECT id FROM chunks WHERE file_id IN ({ids_placeholders})", file_ids
@@ -233,7 +229,9 @@ class Database:
             # 1. Delete associated vectors
             if chunk_ids:
                 c_placeholders = ",".join(["?"] * len(chunk_ids))
-                self.conn.execute(f"DELETE FROM chunks_vec WHERE id IN ({c_placeholders})", chunk_ids)
+                self.conn.execute(
+                    f"DELETE FROM chunks_vec WHERE id IN ({c_placeholders})", chunk_ids
+                )
 
             # 2. Delete chunks (cascades to FTS) and files
             self.conn.execute(f"DELETE FROM chunks WHERE file_id IN ({ids_placeholders})", file_ids)

@@ -145,7 +145,7 @@ class TestInitialScan:
         handler.db.get_all_indexed_paths.return_value = {
             config.watch_dir / "keep.py",
             config.watch_dir / "ghost.py",
-            config.watch_dir / ".hidden", # shouldn't be valid even if on disk
+            config.watch_dir / ".hidden",  # shouldn't be valid even if on disk
         }
         handler.config = config
         from yaaos_sfs.filter import FileFilter
@@ -167,6 +167,7 @@ class TestInitialScan:
         assert len(orphans) == 2
         assert config.watch_dir / "ghost.py" in orphans
         assert config.watch_dir / ".hidden" in orphans
+
 
 class TestGetProvider:
     def test_default_local_provider(self, config):
