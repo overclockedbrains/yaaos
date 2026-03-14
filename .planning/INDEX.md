@@ -19,9 +19,9 @@ Early brainstorming documents. Kept for historical context.
 
 ## Project Status
 
-**Current Phase:** Phase 1.5 — SFS v2 (Production-Ready)
-**Phase 1 (MVP):** Complete (8/9 milestones, tests remaining)
-**Phase 1.5 (v2):** Planning complete, implementation pending
+**Current Phase:** Phase 2 — Model Bus (next up)
+**Phase 1 (MVP):** Complete
+**Phase 1.5 (SFS v2):** Complete (2026-03-15) — v0.2.0, 136 tests passing
 **Code Location:** `src/yaaos-sfs/`
 
 ### Quick Reference

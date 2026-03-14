@@ -1,7 +1,7 @@
 # YAAOS Architecture Overview
 
 **Status:** Approved
-**Last Updated:** 2026-03-13
+**Last Updated:** 2026-03-15
 **Project:** YAAOS (Your Agentic AI Operating System)
 
 ---
@@ -82,38 +82,38 @@ Key design decisions:
 
 ### Layer 2: Semantic File System (SFS)
 
-The most unique component. A FUSE-mounted filesystem that understands file *content*, not just names.
+The memory layer of YAAOS. SFS watches a directory, understands file *content* and *meaning*, and provides semantic search to every component above it.
 
 ```
-User writes file to ~/semantic/
+Files created/modified in ~/semantic/
         │
         ▼
 ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
-│  FUSE Layer  │────▶│ Indexing Daemon  │────▶│  sqlite-vec  │
-│  (pyfuse3)   │     │ (inotify watch)  │     │  (vectors +  │
-│              │     │ + text extract   │     │   metadata)  │
-│              │     │ + embed via      │     │              │
-│              │     │   Model Bus      │     │              │
+│  File Watcher│────▶│ Processing      │────▶│  sqlite-vec  │
+│  (watchdog)  │     │ Pipeline        │     │  (vectors +  │
+│              │     │  1. Filter      │     │   FTS5 +     │
+│              │     │  2. Extract     │     │   metadata)  │
+│              │     │  3. Chunk       │     │              │
+│              │     │  4. Embed (GPU) │     │              │
 └──────────────┘     └─────────────────┘     └──────────────┘
-        │                                           │
-        ▼                                           │
-  Normal file I/O                                   │
-  (files stored on                                  │
-   real filesystem)                                 │
                                                     │
 ┌──────────────┐     ┌─────────────────┐            │
 │   CLI Tool   │────▶│  Search Engine   │◀───────────┘
-│  `yaaos-find`│     │  (hybrid: kw +   │
-│              │     │   semantic)       │
+│  `yaaos-find`│     │  3-signal RRF:   │
+│              │     │  vector+kw+path  │
+│  Daemon Query│────▶│  + recency boost │
+│  Server :9749│     │                  │
 └──────────────┘     └─────────────────┘
 ```
 
-Architecture details:
-- **Passthrough FUSE**: The FUSE layer is a thin passthrough -- files are stored on the real ext4/btrfs filesystem. FUSE just intercepts write events.
-- **Async indexing**: File changes trigger inotify events → indexing daemon extracts text → generates embeddings via Model Bus → stores in sqlite-vec.
-- **Hybrid search**: Queries combine keyword matching (SQLite FTS5) with vector similarity (sqlite-vec) for best results.
-- **File format support**: Text extraction via existing libraries (textract/Apache Tika) for PDF, DOCX, code files, markdown, etc.
-- **Chunking strategy**: Large files are chunked (512 tokens with 50-token overlap) for better embedding quality.
+Architecture (v2 — current):
+- **4-layer file filtering**: Hardcoded ignores → .gitignore/.sfsignore → extension whitelist → size limit. Removes ~95% of noise before indexing.
+- **3-tier processing**: Text-native files (code, markdown) → rich documents (PDF, DOCX, PPTX, XLSX, EPUB) → media metadata (EXIF, audio tags, video info).
+- **Smart chunking**: Tree-sitter AST-aware chunking for code (functions/classes as units), section-aware for docs, fixed-size fallback.
+- **Stat-first change detection**: mtime_ns + size_bytes comparison, xxHash128 fallback — 60-100x faster than SHA-256.
+- **3-signal hybrid search**: Vector similarity + FTS5 keyword + path matching, merged via RRF with recency boost.
+- **GPU acceleration**: Auto-detects CUDA/MPS/CPU, adaptive batch sizing (64 GPU, 32 CPU).
+- **Daemon query server**: Localhost HTTP server for instant CLI searches without cold-starting the embedding model.
 
 ### Layer 3: SystemAgentd (Agent Bus)
 
@@ -238,13 +238,39 @@ Data format: JSON-RPC 2.0 over Unix sockets for simplicity and debuggability.
 
 ---
 
-## 5. Development Phases
+## 5. SFS: The Memory Layer
 
-| Phase | Component | Deliverable |
-|-------|-----------|------------|
-| **Phase 1 (MVP)** | Semantic File System | FUSE mount + indexing + CLI search |
-| **Phase 2** | Model Bus | Pluggable provider system + config |
-| **Phase 3** | SystemAgentd | Agent supervisor + first agents |
-| **Phase 4** | Agentic Shell | Intent-driven shell prototype |
-| **Phase 5** | Desktop Environment | Context-driven workspaces |
-| **Phase 6** | Distro | archiso build → bootable ISO |
+SFS is not just a file search tool — it is the **semantic memory layer** that every higher layer depends on for context-aware intelligence. Without SFS, agents are blind, the shell is dumb, and the desktop can't organize anything.
+
+### How Each Layer Consumes SFS
+
+| Layer | How It Uses SFS | Example |
+|-------|----------------|---------|
+| **Model Bus** | SFS is the **context provider** for all AI calls. When any component needs relevant context for a prompt, it queries SFS — OS-level RAG. | Model Bus answering "explain this error" pulls related source files + docs via SFS |
+| **SystemAgentd** | Agents use SFS to **understand the workspace**. An agent assigned a task discovers all relevant files, dependencies, and docs without the user listing them. | Refactor-Agent queries SFS for "payment module" → finds all related files across the codebase |
+| **Agentic Shell** | SFS replaces `find`, `grep`, `locate` with **intent-based search**. Natural language resolves to actual files. | `"open everything related to the login flow"` → SFS returns auth controllers, middleware, tests, docs |
+| **Desktop Environment** | SFS powers **context workspaces** — the desktop auto-organizes around what you're working on by surfacing semantically related files. | Open a Kubernetes PDF → SFS auto-surfaces your YAML configs, Dockerfiles, and deployment notes |
+
+### What Makes SFS Different from Traditional Search
+
+| | Traditional (Spotlight/Windows Search) | SFS |
+|---|---|---|
+| **Indexing** | Filename + keyword extraction | Semantic embeddings — understands *meaning* |
+| **Query** | Exact keyword match | Natural language: "that auth bug I fixed last week" |
+| **Scope** | Files only | Files + code functions + document sections + media metadata |
+| **Intelligence** | Static index | 3-signal hybrid (vector + keyword + path) with recency boost |
+| **Integration** | Standalone search bar | Foundation layer consumed by every YAAOS component |
+
+---
+
+## 6. Development Phases
+
+| Phase | Component | Deliverable | Status |
+|-------|-----------|------------|--------|
+| **Phase 1** | Semantic File System | Daemon + indexing + CLI search | Done |
+| **Phase 1.5** | SFS v2 | Multi-format, smart chunking, GPU, 136 tests | Done |
+| **Phase 2** | Model Bus | Pluggable provider system + config | Next |
+| **Phase 3** | SystemAgentd | Agent supervisor + first agents | Planned |
+| **Phase 4** | Agentic Shell | Intent-driven shell prototype | Planned |
+| **Phase 5** | Desktop Environment | Context-driven workspaces | Planned |
+| **Phase 6** | Distro | archiso build → bootable ISO | Planned |

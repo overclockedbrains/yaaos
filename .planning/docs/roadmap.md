@@ -3,25 +3,27 @@
 **Project:** YAAOS (Your Agentic AI Operating System)
 **Status:** Active Development
 **Start Date:** 2026-03-13
+**Last Updated:** 2026-03-15
 
 ---
 
 ## Phase Overview
 
 ```
-Phase 1 ──▶ Phase 2 ──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 ──▶ Phase 6
-  SFS        Model       System      Agentic      Desktop     Arch
- (MVP)        Bus        Agentd       Shell         DE        ISO
+Phase 1 ──▶ Phase 1.5 ──▶ Phase 2 ──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 ──▶ Phase 6
+  SFS         SFS v2       Model       System      Agentic      Desktop     Arch
+ (MVP)      (Production)    Bus        Agentd       Shell         DE        ISO
+  ✓            ✓
 ```
 
 ---
 
-## Phase 1: Semantic File System (MVP) ← CURRENT
+## Phase 1: Semantic File System (MVP) — DONE
 
 **Goal:** A working semantic search tool — drop files in a folder, search by meaning.
 
 **Platform:** WSL / Linux
-**Stack:** Python 3.11+, uv, pyfuse3, sentence-transformers, sqlite-vec
+**Stack:** Python 3.11+, uv, sentence-transformers, sqlite-vec
 
 | Milestone | Deliverable | Status |
 |-----------|-------------|--------|
@@ -33,19 +35,50 @@ Phase 1 ──▶ Phase 2 ──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 
 | 1.6 | Search engine (hybrid: vector + FTS5 + RRF fusion) | Done |
 | 1.7 | CLI tool (`yaaos-find`) | Done |
 | 1.8 | OpenAI provider plugin (config-based swap) | Done |
-| 1.9 | Tests & polish | Pending |
-
-**Success Criteria:**
-- `yaaos-sfs` daemon watches ~/semantic/ and auto-indexes files
-- `yaaos-find "natural language query"` returns ranked results < 200ms
-- Supports 10+ file types (txt, md, py, js, ts, json, yaml, sh, rs, c, pdf)
-- Provider swap via config (local ↔ OpenAI)
+| 1.9 | Tests & polish | Done |
 
 **Dependencies:** None (standalone)
 
 ---
 
-## Phase 2: Model Bus (Unified AI Runtime)
+## Phase 1.5: SFS v2 (Production-Ready) — DONE
+
+**Goal:** Handle real-world 22GB+ folders at scale with multi-format support, smart chunking, and GPU acceleration.
+
+**Completed:** 2026-03-15 | **Version:** 0.2.0 | **Tests:** 136 passing
+
+| Milestone | Deliverable | Status |
+|-----------|-------------|--------|
+| A1 | 4-layer file filtering (.gitignore, .sfsignore, extension whitelist, size limit) | Done |
+| A2 | Stat-based change detection (mtime_ns + size_bytes, xxHash128 fallback) | Done |
+| A3 | Batch embedding with debouncing + parallel I/O | Done |
+| B1 | Extractor registry with graceful degradation | Done |
+| B2 | Document extractors (PDF, DOCX, PPTX, XLSX, EPUB, RTF) | Done |
+| B3 | Media metadata extractors (EXIF, audio tags, video metadata) | Done |
+| C1 | Chunker registry with extension → chunker mapping | Done |
+| C2 | Tree-sitter AST-aware code chunking | Done |
+| C3 | Section-aware Markdown/RST chunking | Done |
+| D1 | 3-signal RRF search (vector + FTS5 + path matching) with recency boost | Done |
+| D2 | Voyage + Ollama provider plugins | Done |
+| D3 | Daemon query server + periodic re-scan + GPU auto-detection | Done |
+| D4 | 136 tests, ruff-clean | Done |
+
+### SFS's Role in YAAOS
+
+SFS is not just a search tool — it is the **semantic memory layer** that every higher layer depends on:
+
+| Layer | How It Uses SFS |
+|-------|----------------|
+| **Model Bus** | SFS provides context for all AI calls — OS-level RAG. Any component needing relevant files queries SFS. |
+| **SystemAgentd** | Agents discover related files, dependencies, and docs without explicit paths. Agents gain situational awareness. |
+| **Agentic Shell** | Replaces `find`/`grep`/`locate` with intent-based search. `"open everything related to login"` just works. |
+| **Desktop Environment** | Powers context workspaces — the desktop auto-organizes by surfacing semantically related files to what you're working on. |
+
+**Dependencies:** None (standalone, consumed by all layers above)
+
+---
+
+## Phase 2: Model Bus (Unified AI Runtime) ← NEXT
 
 **Goal:** A single API that all YAAOS components use for AI inference, with pluggable providers.
 
