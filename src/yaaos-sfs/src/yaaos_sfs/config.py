@@ -26,16 +26,38 @@ class Config:
     embedding_dims: int = 384
     chunk_size: int = 512
     chunk_overlap: int = 50
-    supported_extensions: list[str] = field(default_factory=lambda: [
-        ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
-        ".json", ".yaml", ".yml", ".toml",
-        ".sh", ".bash", ".zsh",
-        ".rs", ".go", ".c", ".h", ".cpp", ".hpp",
-        ".java", ".rb", ".php",
-        ".css", ".html", ".xml",
-        ".pdf",
-    ])
-    
+    supported_extensions: list[str] = field(
+        default_factory=lambda: [
+            ".txt",
+            ".md",
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".rs",
+            ".go",
+            ".c",
+            ".h",
+            ".cpp",
+            ".hpp",
+            ".java",
+            ".rb",
+            ".php",
+            ".css",
+            ".html",
+            ".xml",
+            ".pdf",
+        ]
+    )
+
     # SFS v2 new settings
     batch_size: int = 50
     debounce_ms: int = 1500
