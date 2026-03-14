@@ -207,6 +207,45 @@ class Database:
                 self.conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
                 self.conn.commit()
 
+    def remove_files_batch(self, paths: list[Path]):
+        """Efficiently remove multiple files in a single transaction."""
+        if not paths:
+            return
+        with self._lock:
+            # Get all file IDs first
+            placeholders = ",".join(["?"] * len(paths))
+            rows = self.conn.execute(
+                f"SELECT id FROM files WHERE path IN ({placeholders})", [str(p) for p in paths]
+            ).fetchall()
+            file_ids = [r["id"] for r in rows]
+
+            if not file_ids:
+                return
+
+            ids_placeholders = ",".join(["?"] * len(file_ids))
+            
+            # Get all chunk IDs for these files
+            chunk_rows = self.conn.execute(
+                f"SELECT id FROM chunks WHERE file_id IN ({ids_placeholders})", file_ids
+            ).fetchall()
+            chunk_ids = [r["id"] for r in chunk_rows]
+
+            # 1. Delete associated vectors
+            if chunk_ids:
+                c_placeholders = ",".join(["?"] * len(chunk_ids))
+                self.conn.execute(f"DELETE FROM chunks_vec WHERE id IN ({c_placeholders})", chunk_ids)
+
+            # 2. Delete chunks (cascades to FTS) and files
+            self.conn.execute(f"DELETE FROM chunks WHERE file_id IN ({ids_placeholders})", file_ids)
+            self.conn.execute(f"DELETE FROM files WHERE id IN ({ids_placeholders})", file_ids)
+            self.conn.commit()
+
+    def get_all_indexed_paths(self) -> set[Path]:
+        """Get a set of all currently indexed absolute paths."""
+        with self._lock:
+            rows = self.conn.execute("SELECT path FROM files").fetchall()
+        return {Path(r["path"]) for r in rows}
+
     def search_vector(self, query_embedding: list[float], top_k: int = 20) -> list[dict]:
         """Search by vector similarity."""
         with self._lock:

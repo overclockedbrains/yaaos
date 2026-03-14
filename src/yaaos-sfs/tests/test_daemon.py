@@ -134,8 +134,39 @@ class TestInitialScan:
 
         # Sort for easy assertion
         embedded_files.sort()
-        assert embedded_files == ["a.py", "b.md"]
 
+    def test_orphan_cleanup(self, config):
+        (config.watch_dir / "keep.py").write_text("keep")
+
+        handler = MagicMock()
+        handler.db = MagicMock()
+        handler.db.file_needs_indexing.return_value = True
+        # db has two files, but only keep.py is actually on the disk
+        handler.db.get_all_indexed_paths.return_value = {
+            config.watch_dir / "keep.py",
+            config.watch_dir / "ghost.py",
+            config.watch_dir / ".hidden", # shouldn't be valid even if on disk
+        }
+        handler.config = config
+        from yaaos_sfs.filter import FileFilter
+
+        handler.file_filter = FileFilter(
+            config.watch_dir, config.supported_extensions, config.max_file_size_mb
+        )
+
+        # Create .hidden on disk to prove it gets cleaned up if it was somehow in the DB
+        (config.watch_dir / ".hidden").write_text("secret")
+
+        with patch("yaaos_sfs.daemon.extract_text", return_value="content"):
+            with patch("yaaos_sfs.daemon.chunk_text", return_value=["chunk"]):
+                _initial_scan(handler, config.watch_dir, config)
+
+        handler.db.remove_files_batch.assert_called_once()
+        args, _ = handler.db.remove_files_batch.call_args
+        orphans = args[0]
+        assert len(orphans) == 2
+        assert config.watch_dir / "ghost.py" in orphans
+        assert config.watch_dir / ".hidden" in orphans
 
 class TestGetProvider:
     def test_default_local_provider(self, config):

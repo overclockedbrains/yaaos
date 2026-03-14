@@ -181,6 +181,15 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config, quiet: b
             if file_filter.should_index(path):
                 files_to_check.append(path)
 
+    # Cleanup: find files in DB that are no longer on disk or allowed
+    valid_paths = set(files_to_check)
+    db_paths = handler.db.get_all_indexed_paths()
+    orphans = db_paths - valid_paths
+    
+    if orphans:
+        log.info(f"Cleaning up {len(orphans)} orphaned/deleted files from index...")
+        handler.db.remove_files_batch(list(orphans))
+
     if not files_to_check:
         if not quiet:
             log.info("No files to index.")
