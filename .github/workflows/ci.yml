@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: src/yaaos-sfs
+        run: uv sync --dev
+
+      - name: Ruff check
+        working-directory: src/yaaos-sfs
+        run: uv run ruff check src/ tests/
+
+      - name: Ruff format check
+        working-directory: src/yaaos-sfs
+        run: uv run ruff format --check src/ tests/
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: src/yaaos-sfs
+        run: uv sync --dev
+
+      - name: Run fast tests (no model loading)
+        working-directory: src/yaaos-sfs
+        run: >
+          uv run pytest tests/ -v
+          --ignore=tests/test_providers.py
+          --ignore=tests/test_integration.py
+          -x
+
+      - name: Run full tests (with embedding model)
+        working-directory: src/yaaos-sfs
+        run: uv run pytest tests/ -v
