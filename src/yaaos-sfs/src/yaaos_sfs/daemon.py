@@ -1,18 +1,32 @@
-"""File watcher daemon — monitors a directory and auto-indexes files."""
+"""File watcher daemon — monitors a directory and auto-indexes files (v2)."""
 
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
+try:
+    from tqdm import tqdm
+except ImportError:
+    # If tqdm isn't available, fallback to a dummy
+    class tqdm:
+        def __init__(self, *args, **kwargs): pass
+        def update(self, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args, **kwargs): pass
+
 from .config import Config
 from .db import Database
+from .filter import FileFilter
 from .indexer import extract_text, chunk_text
 from .providers import EmbeddingProvider
 from .providers.local import LocalEmbeddingProvider
@@ -26,78 +40,197 @@ log = logging.getLogger("yaaos-sfs")
 
 
 class SFSHandler(FileSystemEventHandler):
-    """Handles file events and triggers indexing."""
+    """Handles file events with debouncing and batch processing."""
 
     def __init__(self, db: Database, provider: EmbeddingProvider, config: Config):
         self.db = db
         self.provider = provider
         self.config = config
+        self.file_filter = FileFilter(
+            config.watch_dir,
+            config.supported_extensions,
+            config.max_file_size_mb
+        )
 
-    def _should_index(self, path: Path) -> bool:
-        if not path.is_file():
-            return False
-        if path.name.startswith("."):
-            return False
-        return path.suffix.lower() in self.config.supported_extensions
+        self.pending_events: dict[Path, float] = {}
+        self.lock = threading.Lock()
+        
+        # Start debounce worker
+        self.worker = threading.Thread(target=self._debounce_worker, daemon=True)
+        self.worker.start()
 
-    def _index_file(self, path: Path):
+    def _debounce_worker(self):
+        """Background thread that consumes files that have settled."""
+        while True:
+            time.sleep(0.5)
+            now = time.monotonic()
+            to_process = []
+            
+            with self.lock:
+                for path, timestamp in list(self.pending_events.items()):
+                    if now - timestamp >= (self.config.debounce_ms / 1000.0):
+                        to_process.append(path)
+                        del self.pending_events[path]
+                        
+            if to_process:
+                self._process_batch(to_process)
+
+    def _process_batch(self, paths: list[Path]):
+        """Process a batch of files linearly for real-time updates."""
+        files_to_embed = []
+        chunks_to_embed = []
+
+        for path in paths:
+            try:
+                # Re-check existence as it could have been deleted during debounce
+                if not path.exists():
+                    continue
+
+                if not self.db.file_needs_indexing(path):
+                    continue
+
+                text = extract_text(path)
+                if not text or not text.strip():
+                    continue
+
+                chunks = chunk_text(text, self.config.chunk_size, self.config.chunk_overlap)
+                if not chunks:
+                    continue
+
+                files_to_embed.append((path, chunks))
+                chunks_to_embed.extend(chunks)
+
+                # If batch size reached, flush
+                if len(chunks_to_embed) >= self.config.batch_size:
+                    self._embed_and_upsert(files_to_embed, chunks_to_embed)
+                    files_to_embed.clear()
+                    chunks_to_embed.clear()
+
+            except Exception as e:
+                log.error(f"Failed to process {path.name}: {e}")
+
+        # Flush remainder
+        if files_to_embed:
+            self._embed_and_upsert(files_to_embed, chunks_to_embed)
+
+    def _embed_and_upsert(self, files_batch, chunks_batch):
         try:
-            if not self.db.file_needs_indexing(path):
-                return
-
-            text = extract_text(path)
-            if not text or not text.strip():
-                log.warning(f"No text extracted: {path.name}")
-                return
-
-            chunks = chunk_text(text, self.config.chunk_size, self.config.chunk_overlap)
-            if not chunks:
-                return
-
-            embeddings = self.provider.embed(chunks)
-            self.db.upsert_file(path, chunks, embeddings)
-            log.info(f"Indexed: {path.name} ({len(chunks)} chunks)")
+            embeddings = self.provider.embed(chunks_batch)
+            offset = 0
+            for path, file_chunks in files_batch:
+                n = len(file_chunks)
+                file_embs = embeddings[offset : offset + n]
+                offset += n
+                self.db.upsert_file(path, file_chunks, file_embs)
+                log.info(f"Indexed: {path.name} ({n} chunks)")
         except Exception as e:
-            log.error(f"Failed to index {path.name}: {e}")
+            log.error(f"Batch embedding failed: {e}")
+
+    def _record_event(self, event: FileSystemEvent):
+        if event.is_directory:
+            return
+        path = Path(event.src_path)
+        if self.file_filter.should_index(path):
+            with self.lock:
+                self.pending_events[path] = time.monotonic()
 
     def on_created(self, event: FileSystemEvent):
-        if not event.is_directory:
-            path = Path(event.src_path)
-            if self._should_index(path):
-                self._index_file(path)
+        self._record_event(event)
 
     def on_modified(self, event: FileSystemEvent):
-        if not event.is_directory:
-            path = Path(event.src_path)
-            if self._should_index(path):
-                self._index_file(path)
+        self._record_event(event)
 
     def on_deleted(self, event: FileSystemEvent):
-        if not event.is_directory:
-            path = Path(event.src_path)
+        if event.is_directory:
+            return
+        path = Path(event.src_path)
+        with self.lock:
+            if path in self.pending_events:
+                del self.pending_events[path]
+        try:
             self.db.remove_file(path)
             log.info(f"Removed from index: {path.name}")
+        except Exception:
+            pass
 
 
-def _initial_scan(handler: SFSHandler, watch_dir: Path):
-    """Index all existing files on startup."""
-    files = [f for f in watch_dir.rglob("*") if handler._should_index(f)]
-    if not files:
+def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
+    """Index all existing files on startup using ThreadPoolExecutor + batching."""
+    file_filter = handler.file_filter
+    log.info(f"Scanning directory: {watch_dir}")
+    
+    files_to_check = []
+    for root, dirs, filenames in os.walk(watch_dir):
+        # 1. Very fast dir pruning
+        dirs[:] = [d for d in dirs if file_filter.is_dir_allowed(Path(os.path.join(root, d)))]
+        
+        # 2. File filtering
+        for f in filenames:
+            path = Path(root) / f
+            if file_filter.should_index(path):
+                files_to_check.append(path)
+
+    if not files_to_check:
         log.info("No files to index in initial scan.")
         return
 
-    log.info(f"Initial scan: {len(files)} files to index...")
-    for i, f in enumerate(files, 1):
-        handler._index_file(f)
-        if i % 50 == 0:
-            log.info(f"  Progress: {i}/{len(files)}")
-    log.info(f"Initial scan complete: {len(files)} files processed.")
+    log.info(f"Found {len(files_to_check)} indexable files. Checking for changes...")
+    to_index = [f for f in files_to_check if handler.db.file_needs_indexing(f)]
+
+    if not to_index:
+        log.info("All files are up to date. Indexing caught up.")
+        return
+
+    log.info(f"Initial scan: {len(to_index)} files need indexing.")
+
+    def process_text(path: Path):
+        try:
+            text = extract_text(path)
+            if not text or not text.strip():
+                return None
+            chunks = chunk_text(text, config.chunk_size, config.chunk_overlap)
+            if not chunks:
+                return None
+            return (path, chunks)
+        except Exception as e:
+            log.debug(f"Failed to extract {path.name}: {e}")
+            return None
+
+    current_batch_files = []
+    current_batch_chunks = []
+
+    # Use ThreadPoolExecutor just for I/O + text extraction + local chunking
+    # Embedding happens sequentially in batches
+    workers = min(32, (os.cpu_count() or 4) * 2)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(process_text, p) for p in to_index]
+        
+        with tqdm(total=len(to_index), desc="Indexing") as pbar:
+            for fut in as_completed(futures):
+                pbar.update(1)
+                res = fut.result()
+                if not res:
+                    continue
+                
+                path, chunks = res
+                current_batch_files.append((path, chunks))
+                current_batch_chunks.extend(chunks)
+
+                if len(current_batch_chunks) >= config.batch_size:
+                    handler._embed_and_upsert(current_batch_files, current_batch_chunks)
+                    current_batch_files.clear()
+                    current_batch_chunks.clear()
+
+            # Flush remaining
+            if current_batch_files:
+                handler._embed_and_upsert(current_batch_files, current_batch_chunks)
+                
+    log.info("Initial scan complete.")
 
 
 def _get_provider(config: Config) -> EmbeddingProvider:
     if config.embedding_provider == "openai":
         from .providers.openai_provider import OpenAIEmbeddingProvider
-
         if not config.openai_api_key:
             log.error("OpenAI provider selected but no API key configured.")
             sys.exit(1)
@@ -108,7 +241,7 @@ def _get_provider(config: Config) -> EmbeddingProvider:
 def main():
     """Entry point for the yaaos-sfs daemon."""
     config = Config.load()
-    log.info("YAAOS Semantic File System v0.1.0")
+    log.info(f"YAAOS Semantic File System v0.1.0")
     log.info(f"Watching: {config.watch_dir}")
     log.info(f"Database: {config.db_path}")
     log.info(f"Provider: {config.embedding_provider} ({config.embedding_model})")
@@ -120,7 +253,7 @@ def main():
     handler = SFSHandler(db, provider, config)
 
     # Initial scan
-    _initial_scan(handler, config.watch_dir)
+    _initial_scan(handler, config.watch_dir, config)
 
     # Start watching
     observer = Observer()

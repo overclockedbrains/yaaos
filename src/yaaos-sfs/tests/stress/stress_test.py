@@ -54,6 +54,7 @@ try:
     from yaaos_sfs.config import Config
     from yaaos_sfs.db import Database
     from yaaos_sfs.indexer import extract_text, chunk_text
+    from yaaos_sfs.filter import FileFilter
     from yaaos_sfs.providers.local import LocalEmbeddingProvider
     SFS_AVAILABLE = True
 except ImportError as e:
@@ -107,8 +108,8 @@ class Result(NamedTuple):
 # Phase 1: Corpus scan
 # ---------------------------------------------------------------------------
 
-def scan_corpus(corpus: Path, supported_extensions: list[str]) -> dict:
-    print("\n[Phase 1] Scanning corpus directory...")
+def scan_corpus(corpus: Path, config: "Config" | None) -> dict:
+    print("\n[Phase 1] Scanning corpus directory (V2 Logic)...")
     t0 = time.perf_counter()
 
     total_files = 0
@@ -118,37 +119,42 @@ def scan_corpus(corpus: Path, supported_extensions: list[str]) -> dict:
     skipped_hidden = 0
     per_dir: dict[str, dict] = {}
 
-    for path in corpus.rglob("*"):
-        if not path.is_file():
-            continue
-        total_files += 1
-        try:
-            size = path.stat().st_size
-        except OSError:
-            continue
-        total_size += size
+    if config and SFS_AVAILABLE:
+        file_filter = FileFilter(corpus, config.supported_extensions, config.max_file_size_mb)
+    else:
+        file_filter = None
 
-        # Track per top-level dir
-        try:
-            rel = path.relative_to(corpus)
-            top = rel.parts[0] if len(rel.parts) > 1 else "."
-        except ValueError:
-            top = "."
-        if top not in per_dir:
-            per_dir[top] = {"files": 0, "size": 0, "indexable": 0}
-        per_dir[top]["files"] += 1
-        per_dir[top]["size"] += size
+    for root, dirs, filenames in os.walk(corpus):
+        if file_filter:
+            dirs[:] = [d for d in dirs if file_filter.is_dir_allowed(Path(os.path.join(root, d)))]
 
-        # Apply MVP _should_index logic
-        if path.name.startswith("."):
-            skipped_hidden += 1
-            continue
-        if path.suffix.lower() not in supported_extensions:
-            skipped_by_ext += 1
-            continue
+        for f in filenames:
+            path = Path(root) / f
+            total_files += 1
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            total_size += size
 
-        indexable_files.append(path)
-        per_dir[top]["indexable"] += 1
+            # Track per top-level dir
+            try:
+                rel = path.relative_to(corpus)
+                top = rel.parts[0] if len(rel.parts) > 1 else "."
+            except ValueError:
+                top = "."
+            if top not in per_dir:
+                per_dir[top] = {"files": 0, "size": 0, "indexable": 0}
+            per_dir[top]["files"] += 1
+            per_dir[top]["size"] += size
+
+            if file_filter:
+                if file_filter.should_index(path, file_size=size):
+                    indexable_files.append(path)
+                    per_dir[top]["indexable"] += 1
+            else:
+                indexable_files.append(path)
+                per_dir[top]["indexable"] += 1
 
     elapsed = time.perf_counter() - t0
 
@@ -179,49 +185,83 @@ def run_indexing(
     config: "Config",
     limit: int | None = None,
 ) -> dict:
-    files_to_index = indexable_files[:limit] if limit else indexable_files
-    total = len(files_to_index)
-    print(f"\n[Phase 2] Indexing {total:,} files...")
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from tqdm import tqdm
 
     indexed = 0
     failed = 0
     skipped = 0
     total_chunks = 0
     t0 = time.perf_counter()
-    last_report = t0
 
-    for i, path in enumerate(files_to_index):
+    files_to_index = []
+    for path in indexable_files:
+        if db.file_needs_indexing(path):
+            files_to_index.append(path)
+        else:
+            skipped += 1
+            
+    if limit:
+        files_to_index = files_to_index[:limit]
+
+    total = len(files_to_index)
+    print(f"\n[Phase 2] Indexing {total:,} files (V2 Batched Logic)...")
+
+    def process_file(path: Path):
         try:
-            if not db.file_needs_indexing(path):
-                skipped += 1
-                continue
             text = extract_text(path)
             if not text or not text.strip():
-                failed += 1
-                continue
+                return "failed", None, path
             chunks = chunk_text(text, config.chunk_size, config.chunk_overlap)
             if not chunks:
-                failed += 1
-                continue
-            embeddings = provider.embed(chunks)
-            db.upsert_file(path, chunks, embeddings)
-            indexed += 1
-            total_chunks += len(chunks)
-        except Exception as e:
-            failed += 1
+                return "failed", None, path
+            return "ok", chunks, path
+        except Exception:
+            return "failed", None, path
 
-        # Progress report every 10s or every 100 files
-        now = time.perf_counter()
-        if now - last_report >= 10.0 or (i + 1) % 100 == 0:
-            elapsed = now - t0
-            rate = indexed / elapsed if elapsed > 0 else 0
-            eta_s = (total - i - 1) / rate if rate > 0 else 0
-            print(
-                f"  [{i+1:,}/{total:,}] indexed={indexed:,} failed={failed} "
-                f"rate={rate:.1f} files/s  ETA={fmt_time(eta_s)}",
-                end="\r",
-            )
-            last_report = now
+    current_batch_files = []
+    current_batch_chunks = []
+
+    def flush_batch():
+        nonlocal indexed, total_chunks
+        if not current_batch_chunks:
+            return
+        try:
+            embs = provider.embed(current_batch_chunks)
+            offset = 0
+            for path, ccks in current_batch_files:
+                n = len(ccks)
+                db.upsert_file(path, ccks, embs[offset : offset + n])
+                offset += n
+                indexed += 1
+                total_chunks += n
+        except Exception as e:
+            print(f"Batch embed failed: {e}")
+        finally:
+            current_batch_files.clear()
+            current_batch_chunks.clear()
+
+    workers = min(32, (os.cpu_count() or 4) * 2)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(process_file, p) for p in files_to_index]
+        
+        with tqdm(total=total, desc="Indexing") as pbar:
+            for fut in as_completed(futures):
+                pbar.update(1)
+                try:
+                    status, chunks, path = fut.result()
+                except Exception:
+                    status, chunks, path = "failed", None, None
+                
+                if status == "failed":
+                    failed += 1
+                elif status == "ok" and chunks:
+                    current_batch_files.append((path, chunks))
+                    current_batch_chunks.extend(chunks)
+                    if len(current_batch_chunks) >= config.batch_size:
+                        flush_batch()
+
+            flush_batch()
 
     elapsed = time.perf_counter() - t0
     print(f"\n  Indexing done in {fmt_time(elapsed)}")
@@ -418,7 +458,7 @@ def main():
         ]
 
     # Phase 1: Scan
-    scan = scan_corpus(corpus, supported)
+    scan = scan_corpus(corpus, config if SFS_AVAILABLE else None)
 
     if args.scan_only or not SFS_AVAILABLE:
         print_report(scan, None, None, db_path, corpus)
