@@ -56,6 +56,7 @@ try:
     from yaaos_sfs.indexer import extract_text, chunk_text
     from yaaos_sfs.filter import FileFilter
     from yaaos_sfs.providers.local import LocalEmbeddingProvider
+
     SFS_AVAILABLE = True
 except ImportError as e:
     print(f"WARNING: Could not import yaaos_sfs: {e}")
@@ -66,6 +67,7 @@ except ImportError as e:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def fmt_size(n: int) -> str:
     if n >= 1024**3:
@@ -107,6 +109,7 @@ class Result(NamedTuple):
 # ---------------------------------------------------------------------------
 # Phase 1: Corpus scan
 # ---------------------------------------------------------------------------
+
 
 def scan_corpus(corpus: Path, config: "Config" | None) -> dict:
     print("\n[Phase 1] Scanning corpus directory (V2 Logic)...")
@@ -178,6 +181,7 @@ def scan_corpus(corpus: Path, config: "Config" | None) -> dict:
 # Phase 2: Indexing benchmark
 # ---------------------------------------------------------------------------
 
+
 def run_indexing(
     indexable_files: list[Path],
     db: "Database",
@@ -200,7 +204,7 @@ def run_indexing(
             files_to_index.append(path)
         else:
             skipped += 1
-            
+
     if limit:
         files_to_index = files_to_index[:limit]
 
@@ -244,7 +248,7 @@ def run_indexing(
     workers = min(32, (os.cpu_count() or 4) * 2)
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(process_file, p) for p in files_to_index]
-        
+
         with tqdm(total=total, desc="Indexing") as pbar:
             for fut in as_completed(futures):
                 pbar.update(1)
@@ -252,7 +256,7 @@ def run_indexing(
                     status, chunks, path = fut.result()
                 except Exception:
                     status, chunks, path = "failed", None, None
-                
+
                 if status == "failed":
                     failed += 1
                 elif status == "ok" and chunks:
@@ -281,6 +285,7 @@ def run_indexing(
 # ---------------------------------------------------------------------------
 # Phase 3: Change detection benchmark
 # ---------------------------------------------------------------------------
+
 
 def benchmark_change_detection(indexed_files: list[Path], db: "Database") -> dict:
     """Compare SHA-256 vs stat-only re-check performance."""
@@ -325,39 +330,48 @@ def benchmark_change_detection(indexed_files: list[Path], db: "Database") -> dic
 # Report
 # ---------------------------------------------------------------------------
 
+
 def print_report(scan: dict, index: dict | None, change: dict | None, db_path: Path, corpus: Path):
     db_size = db_path.stat().st_size if db_path.exists() else 0
 
-    print(f"\n{'='*68}")
-    print(f"  YAAOS SFS Stress Test Results")
-    print(f"{'='*68}")
+    print(f"\n{'=' * 68}")
+    print("  YAAOS SFS Stress Test Results")
+    print(f"{'=' * 68}")
     print(f"  Corpus: {corpus}")
-    print(f"{'='*68}")
+    print(f"{'=' * 68}")
 
     rows = [
-        ("Corpus total files",     f"{scan['total_files']:,}",                       ""),
-        ("Corpus total size",      fmt_size(scan['total_size']),                      ""),
-        ("Corpus scan time",       fmt_time(scan['scan_time']),                       "rglob only"),
-        ("Files to index (MVP)",   f"{scan['indexable_count']:,}",                   "passed _should_index()"),
-        ("Skipped (ext mismatch)", f"{scan['skipped_by_ext']:,}",                    ""),
+        ("Corpus total files", f"{scan['total_files']:,}", ""),
+        ("Corpus total size", fmt_size(scan["total_size"]), ""),
+        ("Corpus scan time", fmt_time(scan["scan_time"]), "rglob only"),
+        ("Files to index (MVP)", f"{scan['indexable_count']:,}", "passed _should_index()"),
+        ("Skipped (ext mismatch)", f"{scan['skipped_by_ext']:,}", ""),
     ]
 
     if index:
-        filtering_pct = (1 - scan['indexable_count'] / max(scan['total_files'], 1)) * 100
+        filtering_pct = (1 - scan["indexable_count"] / max(scan["total_files"], 1)) * 100
         rows += [
-            ("Files actually indexed", f"{index['indexed']:,}",                      ""),
-            ("Chunks stored",          f"{index['total_chunks']:,}",                  ""),
-            ("Index time",             fmt_time(index['elapsed']),                    "wall clock"),
-            ("Index throughput",       f"{index['files_per_sec']:.1f} files/s",      ""),
-            ("DB size",                fmt_size(db_size),                             "sqlite-vec"),
-            ("Filtering would remove", f"{filtering_pct:.0f}% of files",             "v2 improvement"),
+            ("Files actually indexed", f"{index['indexed']:,}", ""),
+            ("Chunks stored", f"{index['total_chunks']:,}", ""),
+            ("Index time", fmt_time(index["elapsed"]), "wall clock"),
+            ("Index throughput", f"{index['files_per_sec']:.1f} files/s", ""),
+            ("DB size", fmt_size(db_size), "sqlite-vec"),
+            ("Filtering would remove", f"{filtering_pct:.0f}% of files", "v2 improvement"),
         ]
 
     if change:
         rows += [
-            ("SHA-256 re-check (500)",  fmt_time(change['sha256_time']),             f"{change['sha256_rate']:.0f} files/s (current MVP)"),
-            ("Stat-only re-check (500)",fmt_time(change['stat_time']),              f"{change['stat_rate']:.0f} files/s (v2 approach)"),
-            ("Change detection speedup",f"{change['speedup']:.0f}x faster",         "with stat-first"),
+            (
+                "SHA-256 re-check (500)",
+                fmt_time(change["sha256_time"]),
+                f"{change['sha256_rate']:.0f} files/s (current MVP)",
+            ),
+            (
+                "Stat-only re-check (500)",
+                fmt_time(change["stat_time"]),
+                f"{change['stat_rate']:.0f} files/s (v2 approach)",
+            ),
+            ("Change detection speedup", f"{change['speedup']:.0f}x faster", "with stat-first"),
         ]
 
     label_w = max(len(r[0]) for r in rows) + 2
@@ -365,14 +379,16 @@ def print_report(scan: dict, index: dict | None, change: dict | None, db_path: P
         note_str = f"  ← {note}" if note else ""
         print(f"  {label:<{label_w}} {value:<20}{note_str}")
 
-    print(f"\n  Per-directory breakdown:")
+    print("\n  Per-directory breakdown:")
     print(f"  {'Dir':<22} {'Files':>8}  {'Size':>10}  {'Indexable':>10}")
-    print(f"  {'-'*22} {'-'*8}  {'-'*10}  {'-'*10}")
-    for d, stats in sorted(scan['per_dir'].items()):
-        indexable_note = f"{stats['indexable']:,}" if stats['indexable'] else "0 (skipped)"
-        print(f"  {d:<22} {stats['files']:>8,}  {fmt_size(stats['size']):>10}  {indexable_note:>10}")
+    print(f"  {'-' * 22} {'-' * 8}  {'-' * 10}  {'-' * 10}")
+    for d, stats in sorted(scan["per_dir"].items()):
+        indexable_note = f"{stats['indexable']:,}" if stats["indexable"] else "0 (skipped)"
+        print(
+            f"  {d:<22} {stats['files']:>8,}  {fmt_size(stats['size']):>10}  {indexable_note:>10}"
+        )
 
-    print(f"{'='*68}")
+    print(f"{'=' * 68}")
 
     # Save JSON results
     results = {
@@ -392,29 +408,33 @@ def print_report(scan: dict, index: dict | None, change: dict | None, db_path: P
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="YAAOS SFS stress test — benchmark indexing against a synthetic corpus"
     )
     parser.add_argument(
-        "--corpus", type=str, required=True,
-        help="Path to the corpus directory (from generate_corpus.py)"
+        "--corpus",
+        type=str,
+        required=True,
+        help="Path to the corpus directory (from generate_corpus.py)",
     )
     parser.add_argument(
-        "--config", type=str, default=None,
-        help="Path to SFS config.toml (optional; uses defaults if not specified)"
+        "--config",
+        type=str,
+        default=None,
+        help="Path to SFS config.toml (optional; uses defaults if not specified)",
     )
     parser.add_argument(
-        "--limit", type=int, default=None,
-        help="Limit indexing to N files (for quick sanity runs)"
+        "--limit", type=int, default=None, help="Limit indexing to N files (for quick sanity runs)"
     )
     parser.add_argument(
-        "--db", type=str, default=None,
-        help="Temp DB path (default: %%TEMP%%\\sfs_stress_test.db)"
+        "--db", type=str, default=None, help="Temp DB path (default: %%TEMP%%\\sfs_stress_test.db)"
     )
     parser.add_argument(
-        "--scan-only", action="store_true",
-        help="Only scan + count files, skip indexing (fastest check)"
+        "--scan-only",
+        action="store_true",
+        help="Only scan + count files, skip indexing (fastest check)",
     )
     args = parser.parse_args()
 
@@ -430,15 +450,15 @@ def main():
         db_path.unlink()
         print(f"Removed stale stress DB: {db_path}")
 
-    print(f"\n{'='*68}")
-    print(f"  YAAOS SFS Stress Test")
-    print(f"{'='*68}")
+    print(f"\n{'=' * 68}")
+    print("  YAAOS SFS Stress Test")
+    print(f"{'=' * 68}")
     print(f"  Corpus   : {corpus}")
     print(f"  DB       : {db_path}")
     print(f"  SFS      : {'available' if SFS_AVAILABLE else 'SCAN-ONLY (import failed)'}")
     if args.limit:
         print(f"  Limit    : {args.limit} files")
-    print(f"{'='*68}")
+    print(f"{'=' * 68}")
 
     # Load config / supported extensions
     if SFS_AVAILABLE:
@@ -447,15 +467,9 @@ def main():
         # Override watch_dir to our corpus and db_path to temp
         config.watch_dir = corpus
         config.db_path = db_path
-        supported = config.supported_extensions
     else:
         # Minimal fallback for scan-only mode
-        supported = [
-            ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
-            ".json", ".yaml", ".yml", ".toml", ".sh", ".rs",
-            ".go", ".c", ".h", ".cpp", ".java", ".rb", ".php",
-            ".css", ".html", ".xml", ".pdf",
-        ]
+        pass
 
     # Phase 1: Scan
     scan = scan_corpus(corpus, config if SFS_AVAILABLE else None)
@@ -465,15 +479,13 @@ def main():
         return
 
     # Phase 2: Index
-    print(f"\nLoading embedding model (all-MiniLM-L6-v2)...")
+    print("\nLoading embedding model (all-MiniLM-L6-v2)...")
     t_model = time.perf_counter()
     provider = LocalEmbeddingProvider(config.embedding_model)
     print(f"  Model loaded in {fmt_time(time.perf_counter() - t_model)}")
 
     db = Database(db_path, embedding_dims=provider.dims)
-    index_results = run_indexing(
-        scan["indexable_files"], db, provider, config, limit=args.limit
-    )
+    index_results = run_indexing(scan["indexable_files"], db, provider, config, limit=args.limit)
 
     # Phase 3: Change detection benchmark
     change_results = benchmark_change_detection(scan["indexable_files"], db)

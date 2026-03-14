@@ -21,34 +21,35 @@ class TestSFSHandler:
         handler = self._make_handler(config)
         f = config.watch_dir / "test.py"
         f.write_text("print('hi')")
-        assert handler._should_index(f) is True
+        assert handler.file_filter.should_index(f) is True
 
     def test_should_not_index_hidden_file(self, config):
         handler = self._make_handler(config)
         f = config.watch_dir / ".hidden"
         f.write_text("secret")
-        assert handler._should_index(f) is False
+        assert handler.file_filter.should_index(f) is False
 
     def test_should_not_index_unsupported_extension(self, config):
         handler = self._make_handler(config)
         f = config.watch_dir / "binary.exe"
         f.write_bytes(b"\x00\x01")
-        assert handler._should_index(f) is False
+        assert handler.file_filter.should_index(f) is False
 
     def test_should_not_index_directory(self, config):
         handler = self._make_handler(config)
         d = config.watch_dir / "subdir"
         d.mkdir()
-        assert handler._should_index(d) is False
+        # Directories typically don't match the supported extensions
+        assert handler.file_filter.should_index(d) is False
 
     def test_should_index_all_supported_types(self, config):
         handler = self._make_handler(config)
         for ext in [".py", ".js", ".ts", ".md", ".txt", ".json", ".yaml", ".toml", ".sh", ".rs"]:
             f = config.watch_dir / f"test{ext}"
             f.write_text("content")
-            assert handler._should_index(f) is True, f"Should index {ext}"
+            assert handler.file_filter.should_index(f) is True, f"Should index {ext}"
 
-    def test_index_file_calls_db(self, config):
+    def test_process_batch_calls_db(self, config):
         handler = self._make_handler(config)
         handler.db.file_needs_indexing.return_value = True
 
@@ -57,21 +58,21 @@ class TestSFSHandler:
 
         with patch("yaaos_sfs.daemon.extract_text", return_value="def foo(): pass"):
             with patch("yaaos_sfs.daemon.chunk_text", return_value=["def foo(): pass"]):
-                handler._index_file(f)
+                handler._process_batch([f])
 
         handler.db.upsert_file.assert_called_once()
 
-    def test_index_file_skips_if_not_needed(self, config):
+    def test_process_batch_skips_if_not_needed(self, config):
         handler = self._make_handler(config)
         handler.db.file_needs_indexing.return_value = False
 
         f = config.watch_dir / "cached.py"
         f.write_text("already indexed")
-        handler._index_file(f)
+        handler._process_batch([f])
 
         handler.db.upsert_file.assert_not_called()
 
-    def test_index_file_handles_empty_text(self, config):
+    def test_process_batch_handles_empty_text(self, config):
         handler = self._make_handler(config)
         handler.db.file_needs_indexing.return_value = True
 
@@ -79,11 +80,11 @@ class TestSFSHandler:
         f.write_text("")
 
         with patch("yaaos_sfs.daemon.extract_text", return_value=""):
-            handler._index_file(f)
+            handler._process_batch([f])
 
         handler.db.upsert_file.assert_not_called()
 
-    def test_index_file_handles_extraction_error(self, config):
+    def test_process_batch_handles_extraction_error(self, config):
         handler = self._make_handler(config)
         handler.db.file_needs_indexing.return_value = True
 
@@ -92,7 +93,7 @@ class TestSFSHandler:
 
         with patch("yaaos_sfs.daemon.extract_text", side_effect=Exception("read error")):
             # Should not raise
-            handler._index_file(f)
+            handler._process_batch([f])
 
         handler.db.upsert_file.assert_not_called()
 
@@ -105,15 +106,35 @@ class TestInitialScan:
         (config.watch_dir / ".hidden").write_text("skip")
         (config.watch_dir / "c.exe").write_bytes(b"\x00")
 
-        handler = MagicMock(spec=SFSHandler)
+        handler = MagicMock()
+        handler.db = MagicMock()
+        handler.db.file_needs_indexing.return_value = True
         handler.config = config
-        # Make _should_index behave like real handler
-        handler._should_index = SFSHandler._should_index.__get__(handler)
+        # Use real FileFilter so filtering works correctly
+        from yaaos_sfs.filter import FileFilter
 
-        _initial_scan(handler, config.watch_dir)
+        handler.file_filter = FileFilter(
+            config.watch_dir, config.supported_extensions, config.max_file_size_mb
+        )
 
-        # Should have tried to index .py and .md, not .hidden or .exe
-        assert handler._index_file.call_count == 2
+        # Mock chunking so embed_and_upsert actually gets valid data
+        with patch("yaaos_sfs.daemon.extract_text", return_value="content"):
+            with patch("yaaos_sfs.daemon.chunk_text", return_value=["chunk"]):
+                _initial_scan(handler, config.watch_dir, config)
+
+        # Should have tried to upsert .py and .md, not .hidden or .exe
+        # _embed_and_upsert accepts batches, so it might be called once or twice
+        assert handler._embed_and_upsert.call_count >= 1
+
+        # Check what files were passed to _embed_and_upsert
+        embedded_files = []
+        for call_args in handler._embed_and_upsert.call_args_list:
+            files_batch, _ = call_args[0]
+            embedded_files.extend([f[0].name for f in files_batch])
+
+        # Sort for easy assertion
+        embedded_files.sort()
+        assert embedded_files == ["a.py", "b.md"]
 
 
 class TestGetProvider:
