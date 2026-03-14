@@ -63,6 +63,7 @@ def chunk_yaml(text: str, config: dict) -> list[str]:
     # Try to parse YAML
     try:
         import yaml
+
         data = yaml.safe_load(text)
         if isinstance(data, dict):
             lines = _flatten_json(data, prefix="")

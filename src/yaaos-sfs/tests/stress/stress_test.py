@@ -217,7 +217,9 @@ def run_indexing(
             text = extract_text(path)
             if not text or not text.strip():
                 return "failed", None, path
-            chunks = chunk_text(text, chunk_size=config.chunk_size, chunk_overlap=config.chunk_overlap)
+            chunks = chunk_text(
+                text, chunk_size=config.chunk_size, chunk_overlap=config.chunk_overlap
+            )
             if not chunks:
                 return "failed", None, path
             return "ok", chunks, path

@@ -34,21 +34,39 @@ _LANG_MAP: dict[str, str] = {
 # Node types that represent top-level symbols we want to extract
 _SYMBOL_TYPES: dict[str, set[str]] = {
     "python": {"function_definition", "class_definition", "decorated_definition"},
-    "javascript": {"function_declaration", "class_declaration", "method_definition",
-                    "arrow_function", "export_statement"},
-    "typescript": {"function_declaration", "class_declaration", "method_definition",
-                    "arrow_function", "export_statement", "interface_declaration",
-                    "type_alias_declaration"},
-    "rust": {"function_item", "impl_item", "struct_item", "enum_item", "trait_item",
-             "mod_item"},
+    "javascript": {
+        "function_declaration",
+        "class_declaration",
+        "method_definition",
+        "arrow_function",
+        "export_statement",
+    },
+    "typescript": {
+        "function_declaration",
+        "class_declaration",
+        "method_definition",
+        "arrow_function",
+        "export_statement",
+        "interface_declaration",
+        "type_alias_declaration",
+    },
+    "rust": {"function_item", "impl_item", "struct_item", "enum_item", "trait_item", "mod_item"},
     "go": {"function_declaration", "method_declaration", "type_declaration"},
     "c": {"function_definition", "struct_specifier"},
     "cpp": {"function_definition", "class_specifier", "struct_specifier", "namespace_definition"},
-    "java": {"class_declaration", "method_declaration", "interface_declaration",
-             "constructor_declaration"},
+    "java": {
+        "class_declaration",
+        "method_declaration",
+        "interface_declaration",
+        "constructor_declaration",
+    },
     "ruby": {"method", "class", "module"},
-    "c_sharp": {"class_declaration", "method_declaration", "interface_declaration",
-                "struct_declaration"},
+    "c_sharp": {
+        "class_declaration",
+        "method_declaration",
+        "interface_declaration",
+        "struct_declaration",
+    },
 }
 
 # Minimum chunk size (merge small symbols with neighbors)
@@ -61,6 +79,7 @@ def _get_parser(language: str):
     """Get a tree-sitter parser for the given language. Returns (parser, language_obj) or None."""
     try:
         import tree_sitter_languages
+
         parser = tree_sitter_languages.get_parser(language)
         ts_language = tree_sitter_languages.get_language(language)
         return parser, ts_language
@@ -70,6 +89,7 @@ def _get_parser(language: str):
     # Try the newer tree-sitter API with individual language packages
     try:
         import tree_sitter
+
         lang_module = __import__(f"tree_sitter_{language.replace('-', '_')}")
         lang = tree_sitter.Language(lang_module.language())
         parser = tree_sitter.Parser(lang)
@@ -83,7 +103,7 @@ def _extract_symbols(node, symbol_types: set[str], source_bytes: bytes) -> list[
     symbols = []
 
     if node.type in symbol_types:
-        text = source_bytes[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+        text = source_bytes[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
         symbols.append(text)
     else:
         for child in node.children:

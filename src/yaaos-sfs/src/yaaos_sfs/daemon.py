@@ -102,7 +102,8 @@ class SFSHandler(FileSystemEventHandler):
                     continue
 
                 chunks = chunk_text(
-                    text, path=path,
+                    text,
+                    path=path,
                     chunk_size=self.config.chunk_size,
                     chunk_overlap=self.config.chunk_overlap,
                 )
@@ -217,7 +218,8 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config, quiet: b
             if not text or not text.strip():
                 return None
             chunks = chunk_text(
-                text, path=path,
+                text,
+                path=path,
                 chunk_size=config.chunk_size,
                 chunk_overlap=config.chunk_overlap,
             )

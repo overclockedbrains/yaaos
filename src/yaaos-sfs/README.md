@@ -114,6 +114,7 @@ When the daemon is running, queries are **instant** (~50ms). If the daemon is do
 # Lint
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
+uv run ruff check --fix src/ tests/
 
 # Fast unit tests (no model loading)
 uv run pytest tests/ -v --ignore=tests/test_integration.py --ignore=tests/stress_test.py -x

@@ -86,18 +86,21 @@ def _register_all() -> None:
     """Register all built-in chunkers."""
     try:
         from .code import register_chunkers as register_code
+
         register_code()
     except Exception as e:
         log.debug(f"Code chunkers not available: {e}")
 
     try:
         from .document import register_chunkers as register_docs
+
         register_docs()
     except Exception as e:
         log.debug(f"Document chunkers not available: {e}")
 
     try:
         from .structured import register_chunkers as register_structured
+
         register_structured()
     except Exception as e:
         log.debug(f"Structured chunkers not available: {e}")

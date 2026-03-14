@@ -30,9 +30,18 @@ def extract_image_metadata(path: Path) -> str | None:
             for tag_id, value in exif_data.items():
                 tag_name = TAGS.get(tag_id, str(tag_id))
                 if tag_name in (
-                    "Make", "Model", "DateTime", "DateTimeOriginal",
-                    "Software", "Artist", "Copyright", "ImageDescription",
-                    "UserComment", "XPTitle", "XPComment", "XPSubject",
+                    "Make",
+                    "Model",
+                    "DateTime",
+                    "DateTimeOriginal",
+                    "Software",
+                    "Artist",
+                    "Copyright",
+                    "ImageDescription",
+                    "UserComment",
+                    "XPTitle",
+                    "XPComment",
+                    "XPSubject",
                     "XPKeywords",
                 ):
                     # Clean up byte values
@@ -86,8 +95,15 @@ def extract_audio_metadata(path: Path) -> str | None:
 
         # Tags
         tag_fields = [
-            "title", "artist", "album", "albumartist", "genre",
-            "date", "tracknumber", "composer", "comment",
+            "title",
+            "artist",
+            "album",
+            "albumartist",
+            "genre",
+            "date",
+            "tracknumber",
+            "composer",
+            "comment",
         ]
         if audio.tags:
             for field in tag_fields:

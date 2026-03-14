@@ -10,12 +10,14 @@ class TestVoyageProvider:
         """Should raise ImportError if voyageai not installed."""
         try:
             import voyageai  # noqa: F401
+
             pytest.skip("voyageai is installed, can't test import error")
         except ImportError:
             pass
 
         with pytest.raises(ImportError, match="voyageai"):
             from yaaos_sfs.providers.voyage_provider import VoyageEmbeddingProvider
+
             VoyageEmbeddingProvider(api_key="test")
 
     def test_dims_mapping(self):

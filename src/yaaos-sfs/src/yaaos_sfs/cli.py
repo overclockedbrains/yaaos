@@ -16,7 +16,13 @@ console = Console()
 @click.group(invoke_without_command=True)
 @click.argument("query", required=False)
 @click.option("--top", "-n", default=10, help="Number of results to show")
-@click.option("--type", "-t", "file_type", default=None, help="Filter by extension(s), comma-separated (e.g. py,md,pdf)")
+@click.option(
+    "--type",
+    "-t",
+    "file_type",
+    default=None,
+    help="Filter by extension(s), comma-separated (e.g. py,md,pdf)",
+)
 @click.option("--snippets/--no-snippets", default=True, help="Show text snippets")
 @click.option("--status", is_flag=True, help="Show index status")
 @click.option("--config-path", type=click.Path(), default=None, help="Config file path")
@@ -75,7 +81,9 @@ def _show_status(config: Config):
     # Format per-type breakdown
     type_line = ""
     if type_breakdown:
-        parts = [f"{count} {ext}" for ext, count in sorted(type_breakdown.items(), key=lambda x: -x[1])]
+        parts = [
+            f"{count} {ext}" for ext, count in sorted(type_breakdown.items(), key=lambda x: -x[1])
+        ]
         type_line = f"\n[bold]By type:[/bold] {', '.join(parts)}"
 
     panel = Panel(
@@ -106,6 +114,7 @@ def _do_search(config: Config, query: str, top_k: int, file_type: str | None, sh
 
         # Use the same provider factory as the daemon
         from .daemon import _get_provider
+
         provider = _get_provider(config)
 
         db = Database(config.db_path, embedding_dims=provider.dims)

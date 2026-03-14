@@ -85,7 +85,9 @@ class TestSearchResultV2:
         assert r.modified_at == ""
 
     def test_new_fields_set(self):
-        r = SearchResult("path", "file.py", "text", 0, 0.5, file_type="py", modified_at="2024-01-01")
+        r = SearchResult(
+            "path", "file.py", "text", 0, 0.5, file_type="py", modified_at="2024-01-01"
+        )
         assert r.file_type == "py"
         assert r.modified_at == "2024-01-01"
 

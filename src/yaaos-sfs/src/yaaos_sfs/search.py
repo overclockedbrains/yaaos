@@ -93,8 +93,7 @@ def hybrid_search(
 
     # Third signal: path matching
     path_scored = [
-        (cid, _fuzzy_path_score(query, data.get("path", "")))
-        for cid, data in result_data.items()
+        (cid, _fuzzy_path_score(query, data.get("path", ""))) for cid, data in result_data.items()
     ]
     path_scored = [(cid, s) for cid, s in path_scored if s > 0]
     path_scored.sort(key=lambda x: x[1], reverse=True)

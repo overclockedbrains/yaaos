@@ -55,11 +55,13 @@ def _register_all() -> None:
     """Register all built-in extractors. Called at module load time."""
     # Text extractors (always available)
     from .text import register_extractors as register_text
+
     register_text()
 
     # Document extractors (optional deps)
     try:
         from .documents import register_extractors as register_docs
+
         register_docs()
     except Exception as e:
         log.debug(f"Document extractors not available: {e}")
@@ -67,6 +69,7 @@ def _register_all() -> None:
     # Media metadata extractors (optional deps)
     try:
         from .media import register_extractors as register_media
+
         register_media()
     except Exception as e:
         log.debug(f"Media extractors not available: {e}")

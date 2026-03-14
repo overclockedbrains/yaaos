@@ -126,6 +126,7 @@ class TestJsonChunker:
 
     def test_large_array_summarized(self):
         import json
+
         data = list(range(100))
         text = json.dumps(data)
         chunks = chunk_json(text, {"chunk_size": 512})
