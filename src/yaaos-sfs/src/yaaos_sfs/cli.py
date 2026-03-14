@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 
@@ -20,6 +19,7 @@ console = Console()
 def _get_provider(config: Config):
     if config.embedding_provider == "openai":
         from .providers.openai_provider import OpenAIEmbeddingProvider
+
         return OpenAIEmbeddingProvider(config.openai_api_key, config.openai_model)
     return LocalEmbeddingProvider(config.embedding_model)
 
@@ -44,6 +44,7 @@ def main(ctx, query, top, file_type, snippets, status, config_path):
       yaaos-find --status
     """
     from pathlib import Path
+
     config_p = Path(config_path) if config_path else None
     config = Config.load(config_p)
 
@@ -89,13 +90,12 @@ def _do_search(config: Config, query: str, top_k: int, file_type: str | None, sh
         results = [r for r in results if r.file_path.endswith(ext)]
 
     if not results:
-        console.print(f"[yellow]No results found for:[/yellow] \"{query}\"")
+        console.print(f'[yellow]No results found for:[/yellow] "{query}"')
         return
 
-    console.print(f"\n[bold blue]Results for:[/bold blue] \"{query}\"\n")
+    console.print(f'\n[bold blue]Results for:[/bold blue] "{query}"\n')
 
     for i, result in enumerate(results, 1):
-        score_bar = "+" * int(result.score * 100)
         header = Text()
         header.append(f"  {i}. ", style="bold white")
         header.append(result.filename, style="bold cyan")

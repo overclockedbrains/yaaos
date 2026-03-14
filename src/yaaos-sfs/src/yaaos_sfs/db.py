@@ -101,9 +101,7 @@ class Database:
         now = datetime.now(timezone.utc).isoformat()
 
         # Delete old data if exists
-        old = self.conn.execute(
-            "SELECT id FROM files WHERE path = ?", (str(path),)
-        ).fetchone()
+        old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
         if old:
             file_id = old["id"]
             # Get old chunk IDs to remove from vec table
@@ -111,18 +109,21 @@ class Database:
                 "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
             ).fetchall()
             for chunk in old_chunks:
-                self.conn.execute(
-                    "DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],)
-                )
+                self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
             self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
             self.conn.execute(
                 """UPDATE files SET filename=?, extension=?, size_bytes=?,
                    modified_at=?, indexed_at=?, content_hash=?, chunk_count=?
                    WHERE id=?""",
                 (
-                    path.name, path.suffix, stat.st_size,
+                    path.name,
+                    path.suffix,
+                    stat.st_size,
                     datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                    now, content_hash, len(chunks), file_id,
+                    now,
+                    content_hash,
+                    len(chunks),
+                    file_id,
                 ),
             )
         else:
@@ -131,9 +132,14 @@ class Database:
                    modified_at, indexed_at, content_hash, chunk_count)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    str(path), path.name, path.suffix, stat.st_size,
+                    str(path),
+                    path.name,
+                    path.suffix,
+                    stat.st_size,
                     datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                    now, content_hash, len(chunks),
+                    now,
+                    content_hash,
+                    len(chunks),
                 ),
             )
             file_id = cursor.lastrowid
@@ -155,25 +161,19 @@ class Database:
 
     def remove_file(self, path: Path):
         """Remove a file and all its chunks from the index."""
-        old = self.conn.execute(
-            "SELECT id FROM files WHERE path = ?", (str(path),)
-        ).fetchone()
+        old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
         if old:
             file_id = old["id"]
             old_chunks = self.conn.execute(
                 "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
             ).fetchall()
             for chunk in old_chunks:
-                self.conn.execute(
-                    "DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],)
-                )
+                self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
             self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
             self.conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
             self.conn.commit()
 
-    def search_vector(
-        self, query_embedding: list[float], top_k: int = 20
-    ) -> list[dict]:
+    def search_vector(self, query_embedding: list[float], top_k: int = 20) -> list[dict]:
         """Search by vector similarity."""
         rows = self.conn.execute(
             """

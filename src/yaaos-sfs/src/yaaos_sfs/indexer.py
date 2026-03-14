@@ -23,6 +23,7 @@ def _extract_pdf(path: Path) -> str | None:
     """Extract text from PDF using PyMuPDF."""
     try:
         import pymupdf
+
         doc = pymupdf.open(str(path))
         text_parts = []
         for page in doc:
