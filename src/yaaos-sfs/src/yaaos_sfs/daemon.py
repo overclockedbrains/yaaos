@@ -19,10 +19,18 @@ try:
 except ImportError:
     # If tqdm isn't available, fallback to a dummy
     class tqdm:
-        def __init__(self, *args, **kwargs): pass
-        def update(self, *args, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def update(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            pass
+
 
 from .config import Config
 from .db import Database
@@ -47,14 +55,12 @@ class SFSHandler(FileSystemEventHandler):
         self.provider = provider
         self.config = config
         self.file_filter = FileFilter(
-            config.watch_dir,
-            config.supported_extensions,
-            config.max_file_size_mb
+            config.watch_dir, config.supported_extensions, config.max_file_size_mb
         )
 
         self.pending_events: dict[Path, float] = {}
         self.lock = threading.Lock()
-        
+
         # Start debounce worker
         self.worker = threading.Thread(target=self._debounce_worker, daemon=True)
         self.worker.start()
@@ -65,13 +71,13 @@ class SFSHandler(FileSystemEventHandler):
             time.sleep(0.5)
             now = time.monotonic()
             to_process = []
-            
+
             with self.lock:
                 for path, timestamp in list(self.pending_events.items()):
                     if now - timestamp >= (self.config.debounce_ms / 1000.0):
                         to_process.append(path)
                         del self.pending_events[path]
-                        
+
             if to_process:
                 self._process_batch(to_process)
 
@@ -158,12 +164,12 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
     """Index all existing files on startup using ThreadPoolExecutor + batching."""
     file_filter = handler.file_filter
     log.info(f"Scanning directory: {watch_dir}")
-    
+
     files_to_check = []
     for root, dirs, filenames in os.walk(watch_dir):
         # 1. Very fast dir pruning
         dirs[:] = [d for d in dirs if file_filter.is_dir_allowed(Path(os.path.join(root, d)))]
-        
+
         # 2. File filtering
         for f in filenames:
             path = Path(root) / f
@@ -204,14 +210,14 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
     workers = min(32, (os.cpu_count() or 4) * 2)
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(process_text, p) for p in to_index]
-        
+
         with tqdm(total=len(to_index), desc="Indexing") as pbar:
             for fut in as_completed(futures):
                 pbar.update(1)
                 res = fut.result()
                 if not res:
                     continue
-                
+
                 path, chunks = res
                 current_batch_files.append((path, chunks))
                 current_batch_chunks.extend(chunks)
@@ -224,13 +230,14 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
             # Flush remaining
             if current_batch_files:
                 handler._embed_and_upsert(current_batch_files, current_batch_chunks)
-                
+
     log.info("Initial scan complete.")
 
 
 def _get_provider(config: Config) -> EmbeddingProvider:
     if config.embedding_provider == "openai":
         from .providers.openai_provider import OpenAIEmbeddingProvider
+
         if not config.openai_api_key:
             log.error("OpenAI provider selected but no API key configured.")
             sys.exit(1)
@@ -241,7 +248,7 @@ def _get_provider(config: Config) -> EmbeddingProvider:
 def main():
     """Entry point for the yaaos-sfs daemon."""
     config = Config.load()
-    log.info(f"YAAOS Semantic File System v0.1.0")
+    log.info("YAAOS Semantic File System v0.1.0")
     log.info(f"Watching: {config.watch_dir}")
     log.info(f"Database: {config.db_path}")
     log.info(f"Provider: {config.embedding_provider} ({config.embedding_model})")

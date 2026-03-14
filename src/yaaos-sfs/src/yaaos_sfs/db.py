@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import sqlite3
 import struct
 from datetime import datetime, timezone
@@ -35,7 +34,7 @@ class Database:
         self._init_schema()
 
     def _init_schema(self):
-        self.conn.executescript(f"""
+        self.conn.executescript("""
             CREATE TABLE IF NOT EXISTS files (
                 id INTEGER PRIMARY KEY,
                 path TEXT UNIQUE NOT NULL,
@@ -49,13 +48,13 @@ class Database:
                 chunk_count INTEGER DEFAULT 0
             );
         """)
-        
+
         # Safely migrate existing databases to add mtime_ns
         try:
             self.conn.execute("ALTER TABLE files ADD COLUMN mtime_ns INTEGER")
         except sqlite3.OperationalError:
             pass  # Column already exists
-            
+
         self.conn.executescript(f"""
 
             CREATE TABLE IF NOT EXISTS chunks (
@@ -102,7 +101,7 @@ class Database:
         row = self.conn.execute(
             "SELECT mtime_ns, size_bytes, content_hash FROM files WHERE path = ?", (str(path),)
         ).fetchone()
-        
+
         if row is None:
             return True
 

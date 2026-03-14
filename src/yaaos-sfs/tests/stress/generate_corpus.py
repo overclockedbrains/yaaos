@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import os
 import random
-import string
 import sys
 import time
 from pathlib import Path
@@ -27,12 +26,12 @@ from pathlib import Path
 # These ratios mirror the real-world breakdown from the SFS v2 plan.
 # ---------------------------------------------------------------------------
 CATEGORIES = {
-    "node_modules": 0.50,   # 50% — dependency junk
-    "git_objects":  0.10,   # 10% — .git/objects/...
-    "dist":         0.07,   # 7%  — build artifacts
-    "assets":       0.03,   # 3%  — binary images/fonts
-    "src":          0.20,   # 20% — actual source code ← indexed
-    "docs":         0.10,   # 10% — markdown/txt docs  ← indexed
+    "node_modules": 0.50,  # 50% — dependency junk
+    "git_objects": 0.10,  # 10% — .git/objects/...
+    "dist": 0.07,  # 7%  — build artifacts
+    "assets": 0.03,  # 3%  — binary images/fonts
+    "src": 0.20,  # 20% — actual source code ← indexed
+    "docs": 0.10,  # 10% — markdown/txt docs  ← indexed
 }
 
 # File templates for "real" content (src + docs)
@@ -122,7 +121,7 @@ def retry(fn, attempts=3, delay=0.5):
 ]
 
 JS_TEMPLATES = [
-    '''\
+    """\
 // {name}.js — {topic} module
 'use strict';
 
@@ -158,11 +157,11 @@ class {cls} {{
 }}
 
 module.exports = {{ {cls} }};
-''',
+""",
 ]
 
 MD_TEMPLATES = [
-    '''\
+    """\
 # {topic} Documentation
 
 ## Overview
@@ -212,11 +211,11 @@ results = obj.process(items)
 - 2026-03 Initial implementation
 - 2026-02 Architecture review
 - 2026-01 Planning phase
-''',
+""",
 ]
 
 JSON_TEMPLATES = [
-    '''\
+    """\
 {{
   "name": "{name}",
   "version": "1.0.0",
@@ -241,18 +240,38 @@ JSON_TEMPLATES = [
     "stat_change_detection": true
   }}
 }}
-''',
+""",
 ]
 
 TOPICS = [
-    "indexing", "search", "embedding", "filtering", "chunking",
-    "caching", "monitoring", "scheduling", "routing", "parsing",
-    "validation", "serialization", "streaming", "batching", "compression",
+    "indexing",
+    "search",
+    "embedding",
+    "filtering",
+    "chunking",
+    "caching",
+    "monitoring",
+    "scheduling",
+    "routing",
+    "parsing",
+    "validation",
+    "serialization",
+    "streaming",
+    "batching",
+    "compression",
 ]
 
 CLASSES = [
-    "Manager", "Handler", "Processor", "Worker", "Engine",
-    "Controller", "Dispatcher", "Resolver", "Executor", "Builder",
+    "Manager",
+    "Handler",
+    "Processor",
+    "Worker",
+    "Engine",
+    "Controller",
+    "Dispatcher",
+    "Resolver",
+    "Executor",
+    "Builder",
 ]
 
 # ---------------------------------------------------------------------------
@@ -265,12 +284,52 @@ rng = random.Random(42)  # deterministic corpus
 def rand_text(target_bytes: int) -> str:
     """Generate realistic-looking lorem-ipsum-like text of roughly target_bytes."""
     words = [
-        "semantic", "file", "system", "index", "search", "embedding", "vector",
-        "chunk", "token", "model", "provider", "config", "daemon", "watcher",
-        "event", "batch", "async", "thread", "queue", "buffer", "stream",
-        "the", "a", "an", "is", "are", "was", "were", "has", "have", "with",
-        "for", "from", "into", "through", "across", "between", "within",
-        "data", "file", "path", "hash", "stat", "size", "time", "byte",
+        "semantic",
+        "file",
+        "system",
+        "index",
+        "search",
+        "embedding",
+        "vector",
+        "chunk",
+        "token",
+        "model",
+        "provider",
+        "config",
+        "daemon",
+        "watcher",
+        "event",
+        "batch",
+        "async",
+        "thread",
+        "queue",
+        "buffer",
+        "stream",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "has",
+        "have",
+        "with",
+        "for",
+        "from",
+        "into",
+        "through",
+        "across",
+        "between",
+        "within",
+        "data",
+        "file",
+        "path",
+        "hash",
+        "stat",
+        "size",
+        "time",
+        "byte",
     ]
     parts = []
     generated = 0
@@ -326,13 +385,34 @@ def fill_template(template: str, size_bytes: int) -> str:
 # Category generators
 # ---------------------------------------------------------------------------
 
+
 def generate_node_modules(base: Path, budget_bytes: int, progress: list):
     """Simulate a fat node_modules with fake packages."""
     packages = [
-        "lodash", "react", "react-dom", "typescript", "webpack", "babel-core",
-        "eslint", "prettier", "jest", "axios", "express", "next", "vite",
-        "rollup", "esbuild", "tailwindcss", "postcss", "autoprefixer",
-        "dotenv", "chalk", "commander", "minimist", "yargs", "glob",
+        "lodash",
+        "react",
+        "react-dom",
+        "typescript",
+        "webpack",
+        "babel-core",
+        "eslint",
+        "prettier",
+        "jest",
+        "axios",
+        "express",
+        "next",
+        "vite",
+        "rollup",
+        "esbuild",
+        "tailwindcss",
+        "postcss",
+        "autoprefixer",
+        "dotenv",
+        "chalk",
+        "commander",
+        "minimist",
+        "yargs",
+        "glob",
     ]
     nm = base / "node_modules"
     written = 0
@@ -357,7 +437,10 @@ def generate_node_modules(base: Path, budget_bytes: int, progress: list):
             written += actual
         progress[0] += written - progress[0] if written > progress[0] else 0
         if written % (50 * 1024 * 1024) < 100_000:
-            print(f"  [node_modules] {written / 1024**3:.2f} GB / {budget_bytes / 1024**3:.2f} GB", end="\r")
+            print(
+                f"  [node_modules] {written / 1024**3:.2f} GB / {budget_bytes / 1024**3:.2f} GB",
+                end="\r",
+            )
     print()
 
 
@@ -411,8 +494,18 @@ def generate_src(base: Path, budget_bytes: int):
     """Generate realistic source code files."""
     src = base / "src"
     modules = [
-        "core", "indexer", "search", "daemon", "config", "db",
-        "providers", "chunkers", "extractors", "utils", "api", "cli",
+        "core",
+        "indexer",
+        "search",
+        "daemon",
+        "config",
+        "db",
+        "providers",
+        "chunkers",
+        "extractors",
+        "utils",
+        "api",
+        "cli",
     ]
     templates_by_ext = {
         ".py": PYTHON_TEMPLATES,
@@ -433,7 +526,7 @@ def generate_src(base: Path, budget_bytes: int):
         subdir = src / module / ("sub" + str(rng.randint(0, 3)))
         fpath = subdir / f"file_{file_idx:04d}{ext}"
         fpath.parent.mkdir(parents=True, exist_ok=True)
-        fpath.write_text(content[:size * 2], encoding="utf-8")  # approx size
+        fpath.write_text(content[: size * 2], encoding="utf-8")  # approx size
         written += size
         file_idx += 1
     print(f"  [src] {written / 1024**2:.0f} MB written ({file_idx} files)")
@@ -466,42 +559,39 @@ def generate_docs(base: Path, budget_bytes: int):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate a synthetic file corpus for SFS stress testing"
     )
     parser.add_argument(
-        "--size-gb", type=float, default=1.0,
-        help="Total corpus size in GB (default: 1.0)"
+        "--size-gb", type=float, default=1.0, help="Total corpus size in GB (default: 1.0)"
     )
+    parser.add_argument("--output", type=str, required=True, help="Output directory for the corpus")
     parser.add_argument(
-        "--output", type=str, required=True,
-        help="Output directory for the corpus"
-    )
-    parser.add_argument(
-        "--overwrite", action="store_true",
-        help="Delete and recreate output dir if it exists"
+        "--overwrite", action="store_true", help="Delete and recreate output dir if it exists"
     )
     args = parser.parse_args()
 
     output = Path(args.output)
-    total_bytes = int(args.size_gb * 1024 ** 3)
+    total_bytes = int(args.size_gb * 1024**3)
 
     if output.exists() and not args.overwrite:
         print(f"ERROR: {output} already exists. Use --overwrite to replace it.")
         sys.exit(1)
     if output.exists() and args.overwrite:
         import shutil
+
         print(f"Removing existing corpus at {output}...")
         shutil.rmtree(output)
 
     output.mkdir(parents=True, exist_ok=True)
-    print(f"\n{'='*60}")
-    print(f"  YAAOS SFS Stress Test — Corpus Generator")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("  YAAOS SFS Stress Test — Corpus Generator")
+    print(f"{'=' * 60}")
     print(f"  Target size : {args.size_gb:.1f} GB ({total_bytes:,} bytes)")
     print(f"  Output dir  : {output}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     t0 = time.time()
     progress = [0]
@@ -528,22 +618,22 @@ def main():
     total_files = sum(1 for _ in output.rglob("*") if Path(_).is_file())
     actual_bytes = sum(f.stat().st_size for f in output.rglob("*") if f.is_file())
 
-    print(f"\n{'='*60}")
-    print(f"  Corpus Generation Complete")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("  Corpus Generation Complete")
+    print(f"{'=' * 60}")
     print(f"  Total files  : {total_files:,}")
     print(f"  Actual size  : {actual_bytes / 1024**3:.2f} GB")
     print(f"  Time taken   : {elapsed:.1f}s")
     print(f"  Output dir   : {output}")
 
     # Per-directory sizes
-    print(f"\n  Directory breakdown:")
+    print("\n  Directory breakdown:")
     for d in sorted(output.iterdir()):
         if d.is_dir():
             size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
             count = sum(1 for f in d.rglob("*") if f.is_file())
             print(f"    {d.name:<20} {size / 1024**2:8.0f} MB  ({count:,} files)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\nCorpus ready. Run: python stress_test.py --corpus {output}")
 
 

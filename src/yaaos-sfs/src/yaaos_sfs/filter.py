@@ -11,24 +11,37 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Callable
 import pathspec
 
 # Layer 1: Global default ignores (never index these, regardless of gitignore)
 GLOBAL_IGNORED_DIRS = {
-    ".git", ".hg", ".svn",
-    "node_modules", "vendor",
-    "dist", "build", "out", "target", "bin", "obj",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-    ".idea", ".vscode", ".vs",
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "vendor",
+    "dist",
+    "build",
+    "out",
+    "target",
+    "bin",
+    "obj",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".idea",
+    ".vscode",
+    ".vs",
 }
+
 
 class FileFilter:
     def __init__(self, watch_dir: Path, supported_extensions: list[str], max_file_size_mb: float):
         self.watch_dir = watch_dir
         self.supported_extensions = set(ext.lower() for ext in supported_extensions)
         self.max_file_size_bytes = int(max_file_size_mb * 1024 * 1024)
-        
+
         self._gitignore_spec: pathspec.PathSpec | None = None
         self._load_gitignore()
 
@@ -42,13 +55,11 @@ class FileFilter:
                     lines = f.readlines()
             except IOError:
                 pass
-        
+
         # Always add our global defaults to the pathspec to be extra safe
         lines.extend([f"**/{d}/" for d in GLOBAL_IGNORED_DIRS])
-        
-        self._gitignore_spec = pathspec.PathSpec.from_lines(
-            pathspec.patterns.GitWildMatchPattern, lines
-        )
+
+        self._gitignore_spec = pathspec.PathSpec.from_lines("gitignore", lines)
 
     def is_dir_allowed(self, dir_path: Path) -> bool:
         """
@@ -70,7 +81,7 @@ class FileFilter:
                 if self._gitignore_spec.match_file(rel_str):
                     return False
             except ValueError:
-                pass # Path not relative to watch_dir
+                pass  # Path not relative to watch_dir
 
         return True
 
@@ -82,7 +93,7 @@ class FileFilter:
         # 0. Skip hidden files
         if path.name.startswith("."):
             return False
-            
+
         # 1. Check parent directories against hardcoded ignores (if not already filtered by walker)
         # Note: Depending on walker, this might be redundant, but safe.
         for part in path.parts:
@@ -97,7 +108,7 @@ class FileFilter:
                 if self._gitignore_spec.match_file(rel_str):
                     return False
             except ValueError:
-                pass # Not in watch_dir
+                pass  # Not in watch_dir
 
         # 3. Extension whitelist Layer
         if path.suffix.lower() not in self.supported_extensions:
