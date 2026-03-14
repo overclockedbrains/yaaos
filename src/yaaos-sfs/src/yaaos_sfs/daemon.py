@@ -38,6 +38,7 @@ from .filter import FileFilter
 from .indexer import extract_text, chunk_text
 from .providers import EmbeddingProvider
 from .providers.local import LocalEmbeddingProvider
+from .server import QueryServer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -160,10 +161,14 @@ class SFSHandler(FileSystemEventHandler):
             pass
 
 
-def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
-    """Index all existing files on startup using ThreadPoolExecutor + batching."""
+def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config, quiet: bool = False):
+    """Index all existing files using ThreadPoolExecutor + batching.
+
+    When quiet=True (periodic re-scan), only logs if new files are found.
+    """
     file_filter = handler.file_filter
-    log.info(f"Scanning directory: {watch_dir}")
+    if not quiet:
+        log.info(f"Scanning directory: {watch_dir}")
 
     files_to_check = []
     for root, dirs, filenames in os.walk(watch_dir):
@@ -177,17 +182,20 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
                 files_to_check.append(path)
 
     if not files_to_check:
-        log.info("No files to index in initial scan.")
+        if not quiet:
+            log.info("No files to index.")
         return
 
-    log.info(f"Found {len(files_to_check)} indexable files. Checking for changes...")
+    if not quiet:
+        log.info(f"Found {len(files_to_check)} indexable files. Checking for changes...")
     to_index = [f for f in files_to_check if handler.db.file_needs_indexing(f)]
 
     if not to_index:
-        log.info("All files are up to date. Indexing caught up.")
+        if not quiet:
+            log.info("All files are up to date. Indexing caught up.")
         return
 
-    log.info(f"Initial scan: {len(to_index)} files need indexing.")
+    log.info(f"{'Re-scan' if quiet else 'Initial scan'}: {len(to_index)} files need indexing.")
 
     def process_text(path: Path):
         try:
@@ -231,7 +239,7 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path, config: Config):
             if current_batch_files:
                 handler._embed_and_upsert(current_batch_files, current_batch_chunks)
 
-    log.info("Initial scan complete.")
+    log.info(f"{'Re-scan' if quiet else 'Initial scan'} complete.")
 
 
 def _get_provider(config: Config) -> EmbeddingProvider:
@@ -259,8 +267,27 @@ def main():
     db = Database(config.db_path, embedding_dims=provider.dims)
     handler = SFSHandler(db, provider, config)
 
+    # Start query server
+    query_server = QueryServer(db, provider, config)
+    query_server.start_background()
+
     # Initial scan
     _initial_scan(handler, config.watch_dir, config)
+
+    # Start periodic re-scan thread
+    rescan_stop = threading.Event()
+
+    def _periodic_rescan():
+        interval = config.rescan_interval_min * 60
+        while not rescan_stop.wait(interval):
+            try:
+                _initial_scan(handler, config.watch_dir, config, quiet=True)
+            except Exception as e:
+                log.error(f"Periodic re-scan failed: {e}")
+
+    rescan_thread = threading.Thread(target=_periodic_rescan, daemon=True)
+    rescan_thread.start()
+    log.info(f"Periodic re-scan every {config.rescan_interval_min} minutes")
 
     # Start watching
     observer = Observer()
@@ -270,6 +297,8 @@ def main():
 
     def shutdown(sig, frame):
         log.info("Shutting down...")
+        rescan_stop.set()
+        query_server.shutdown()
         observer.stop()
         db.close()
         sys.exit(0)

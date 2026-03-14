@@ -62,6 +62,8 @@ class Config:
     batch_size: int = 50
     debounce_ms: int = 1500
     max_file_size_mb: float = 5.0
+    rescan_interval_min: int = 10
+    query_port: int = 9749
 
     # OpenAI settings (optional)
     openai_api_key: str | None = None
@@ -93,6 +95,10 @@ class Config:
                 config.debounce_ms = sfs["debounce_ms"]
             if "max_file_size_mb" in sfs:
                 config.max_file_size_mb = sfs["max_file_size_mb"]
+            if "rescan_interval_min" in sfs:
+                config.rescan_interval_min = sfs["rescan_interval_min"]
+            if "query_port" in sfs:
+                config.query_port = sfs["query_port"]
 
             embedding = data.get("embedding", {})
             if "provider" in embedding:

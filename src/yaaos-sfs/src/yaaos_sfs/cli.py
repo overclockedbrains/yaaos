@@ -7,21 +7,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from .client import DaemonClient, DaemonNotRunning
 from .config import Config
-from .db import Database
-from .providers.local import LocalEmbeddingProvider
-from .search import hybrid_search
-
 
 console = Console()
-
-
-def _get_provider(config: Config):
-    if config.embedding_provider == "openai":
-        from .providers.openai_provider import OpenAIEmbeddingProvider
-
-        return OpenAIEmbeddingProvider(config.openai_api_key, config.openai_model)
-    return LocalEmbeddingProvider(config.embedding_model)
 
 
 @click.group(invoke_without_command=True)
@@ -60,16 +49,31 @@ def main(ctx, query, top, file_type, snippets, status, config_path):
 
 
 def _show_status(config: Config):
-    db = Database(config.db_path, config.embedding_dims)
-    stats = db.get_stats()
-    db.close()
+    # Try daemon first
+    client = DaemonClient(config.query_port)
+    try:
+        resp = client.status()
+        stats = resp["stats"]
+        daemon_status = "[bold green]running[/bold green]"
+        provider_info = f"{resp['provider']} ({resp['model']})"
+        watch_dir = resp["watch_dir"]
+    except DaemonNotRunning:
+        from .db import Database
+
+        db = Database(config.db_path, config.embedding_dims)
+        stats = db.get_stats()
+        db.close()
+        daemon_status = "[bold red]not running[/bold red]"
+        provider_info = f"{config.embedding_provider} ({config.embedding_model})"
+        watch_dir = str(config.watch_dir)
 
     panel = Panel(
+        f"[bold]Daemon:[/bold] {daemon_status}\n"
         f"[bold]Indexed:[/bold] {stats['files']} files | "
         f"{stats['chunks']} chunks | "
         f"DB size: {stats['db_size_mb']} MB\n"
-        f"[bold]Watch dir:[/bold] {config.watch_dir}\n"
-        f"[bold]Provider:[/bold] {config.embedding_provider} ({config.embedding_model})\n"
+        f"[bold]Watch dir:[/bold] {watch_dir}\n"
+        f"[bold]Provider:[/bold] {provider_info}\n"
         f"[bold]Database:[/bold] {config.db_path}",
         title="YAAOS SFS Status",
         border_style="blue",
@@ -78,11 +82,29 @@ def _show_status(config: Config):
 
 
 def _do_search(config: Config, query: str, top_k: int, file_type: str | None, show_snippets: bool):
-    provider = _get_provider(config)
-    db = Database(config.db_path, embedding_dims=provider.dims)
+    # Try daemon first (instant — no model loading)
+    client = DaemonClient(config.query_port)
+    try:
+        results = client.search(query, top_k=top_k)
+        source = "daemon"
+    except DaemonNotRunning:
+        # Fallback: load model directly (slow first query)
+        console.print("[dim]Daemon not running, loading model locally...[/dim]")
+        from .db import Database
+        from .providers.local import LocalEmbeddingProvider
+        from .search import hybrid_search
 
-    results = hybrid_search(db, provider, query, top_k=top_k)
-    db.close()
+        if config.embedding_provider == "openai":
+            from .providers.openai_provider import OpenAIEmbeddingProvider
+
+            provider = OpenAIEmbeddingProvider(config.openai_api_key, config.openai_model)
+        else:
+            provider = LocalEmbeddingProvider(config.embedding_model)
+
+        db = Database(config.db_path, embedding_dims=provider.dims)
+        results = hybrid_search(db, provider, query, top_k=top_k)
+        db.close()
+        source = "local"
 
     # Filter by type if specified
     if file_type:
@@ -107,6 +129,9 @@ def _do_search(config: Config, query: str, top_k: int, file_type: str | None, sh
             snippet = result.snippet(300)
             console.print(f"     [dim]{snippet}[/dim]")
         console.print()
+
+    if source == "daemon":
+        console.print("[dim]via daemon (instant)[/dim]")
 
 
 if __name__ == "__main__":

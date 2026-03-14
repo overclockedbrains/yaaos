@@ -8,73 +8,98 @@ This document clarifies what components exist, where they run, and how they inte
 
 ## 🏗️ High-Level Architecture
 
-SFS consists of two main programs, both of which you run, and two main "dependencies" which are fully embedded within those programs (no distinct background services required).
+SFS consists of two main programs and a client-daemon IPC layer that connects them. All heavy dependencies (database, embedding model) are embedded within the daemon process — no external servers required.
 
 ### 1. The Core Programs (The "What you run" part)
 
 1. **The Daemon (`yaaos-sfs`)**
-   - **What it is:** A long-running Python background process.
+   - **What it is:** A long-running Python background process with an embedded TCP query server.
    - **When to invoke:** You run it once in a terminal using `uv run yaaos-sfs` and leave it running in the background.
-   - **What it does:** It performs an initial scan of your directory, then listens to local file system events (File Created, File Modified, File Deleted) using the `watchdog` library. When a file is modified, it extracts the text, breaks it into chunks, embeds those chunks into vectors, and saves them to the database.
+   - **What it does:**
+     - Performs an initial scan of your directory.
+     - Listens to local file system events (Created, Modified, Deleted) using `watchdog` with debouncing.
+     - Runs a **periodic re-scan** (every 10 minutes by default) to catch files the OS watcher may have missed (bulk copies, buffer overflows).
+     - Hosts a **TCP query server** on `localhost:9749` so the CLI can search instantly without loading the model.
+     - When a file changes, it extracts text, chunks it, embeds the chunks into vectors, and saves them to the database.
 
 2. **The Finder CLI (`yaaos-find`)**
    - **What it is:** A short-lived terminal command.
    - **When to invoke:** You run it whenever you want to search your codebase. (e.g., `uv run yaaos-find "Where is the file filtering logic?"`).
-   - **What it does:** It takes your search query, converts it into a vector embedding, and asks the database for the most semantically similar chunks of code. It prints the results and quickly exits.
+   - **What it does:** It connects to the running daemon via TCP, sends your query, and gets back results **instantly** (no model loading). If the daemon isn't running, it gracefully falls back to loading the model directly.
+
+3. **The IPC Layer (Client-Daemon Protocol)**
+   - **Protocol:** Length-prefixed JSON over TCP on `localhost:9749` (configurable via `query_port`).
+   - **Messages:** `search` (query + top_k → results), `status` (→ index stats), `ping` (→ health check).
+   - **Why TCP:** Works on all platforms (Linux, WSL, Windows), simple to debug, and the overhead (~1ms roundtrip on localhost) is negligible compared to model loading (~1.5s).
 
 ---
 
 ### 2. The Core Technologies (The "Where does it run" part)
 
-A common point of confusion is over things like the "Database" or the "AI Model". **In YAAOS SFS, everything is embedded locally in the Python process.** There are *no* external standalone servers running on separate ports.
+A common point of confusion is over things like the "Database" or the "AI Model". **In YAAOS SFS, everything is embedded locally in the daemon process.** There are *no* external standalone servers running on separate ports (other than the daemon's own TCP query server).
 
 1. **The Database (`sqlite-vec`)**
-   - **Where it runs:** It runs inside the Python process of whoever calls it. There is **no separate SQL server** (like PostgreSQL or MySQL) running in the background.
-   - **How it works:** `sqlite-vec` acts exactly like standard SQLite but with vector math support. It reads and writes directly to a file stored locally on your disk (usually around `~/.local/share/yaaos/sfs.db`). 
-   - Both the Daemon and the Finder CLI access this exact same file directly.
+   - **Where it runs:** Inside the daemon process. There is **no separate SQL server** (like PostgreSQL or MySQL) running in the background.
+   - **How it works:** `sqlite-vec` acts exactly like standard SQLite but with vector math support. It reads and writes directly to a file stored locally on your disk (at `~/.local/share/yaaos/sfs.db`).
+   - **Thread safety:** The database uses `check_same_thread=False` with a `threading.Lock` to safely handle concurrent access from the watchdog thread, debounce worker, periodic re-scan, and query server.
+   - The CLI no longer needs to open the DB directly — it queries the daemon instead.
 
 2. **The Local Embedding Model (`sentence-transformers`)**
-   - **Where it runs:** It is downloaded to your local `.cache/huggingface` folder the first time you run YAAOS, and from then on it runs completely locally using your CPU (or GPU if configured).
-   - **How it works:** When the Daemon (`yaaos-sfs`) starts, it loads the model into its memory to embed files. Similarly, when the Finder (`yaaos-find`) is executed, it loads the model into its memory to embed your search query. 
+   - **Where it runs:** Loaded **once** into the daemon's memory at startup. Downloaded to your local `.cache/huggingface` folder the first time you run YAAOS, then runs completely locally using your CPU (or GPU if configured).
+   - **How it works:** The daemon holds the model in memory and uses it for both indexing and search queries. The CLI sends queries to the daemon over TCP, so **the model is never loaded twice**. If the daemon is not running, the CLI falls back to loading its own model instance (slower).
    - *Note: You can opt out of the local model by configuring the `openai` provider, which will send text over the network to OpenAI APIs instead.*
 
 ---
 
 ## 🗺️ Component Flow Diagrams
 
-### SFS Daemon (Background Watcher) Flow
+### SFS Daemon (Background Watcher + Query Server) Flow
 ```mermaid
 flowchart TD
     OS[Operating System / File System]
+    CLI[yaaos-find CLI]
     subgraph Daemon [YAAOS-SFS Daemon]
         Watchdog[Watchdog Listener]
+        Rescan[Periodic Re-scan\nevery 10 min]
         Filter[4-Layer File Filter]
         Chunker[Text Extraction & Chunker]
         Model((Local Embedding Model))
+        QS[Query Server\nTCP :9749]
     end
-    DB[(SQLite-Vec DB)]
+    DB[(SQLite-Vec DB\nthread-safe)]
 
-    OS -- File Modified --> Watchdog
-    Watchdog -- Debouced Path --> Filter
+    OS -- File Events --> Watchdog
+    Watchdog -- Debounced Path --> Filter
+    Rescan -. Catches missed files .-> Filter
     Filter -- Allowed paths --> Chunker
     Chunker -- Text Chunks --> Model
     Model -- Vectors --> DB
+
+    CLI -- "JSON/TCP query" --> QS
+    QS -- Embed query --> Model
+    QS -- Vector search --> DB
+    QS -- "JSON results" --> CLI
 ```
 
-### Search CLI Flow
+### Search CLI Flow (Daemon Mode vs Fallback)
 ```mermaid
 flowchart LR
     User[User Terminal]
-    subgraph CLI [YAAOS-FIND CLI]
-        Model((Local Embedding Model))
+    subgraph CLI [yaaos-find CLI]
+        Client[Daemon Client]
+        Fallback[Local Model\nonly if daemon down]
+    end
+    subgraph Daemon [yaaos-sfs Daemon]
+        QS[Query Server :9749]
     end
     DB[(SQLite-Vec DB)]
 
-    User -- "Search Query" --> CLI
-    CLI -- Query --> Model
-    Model -- "Vector [0.1, 0.4...]" --> DB
-    DB -- "Cosine Similarity Search" --> CLI
-    CLI -- "Results" --> User
+    User -- "Search Query" --> Client
+    Client -- "TCP :9749" --> QS
+    QS -- "Instant Results" --> Client
+    Client -. "Connection refused" .-> Fallback
+    Fallback -. "Load model + query DB" .-> DB
+    Client -- "Results" --> User
 ```
 
 ---
@@ -85,24 +110,31 @@ Let's trace a practical example:
 
 1. **Starting Up (& Restarting):** You run `uv run yaaos-sfs`.
    - The Python process starts.
-   - It directly creates/opens the local SQLite file on your disk.
+   - It directly creates/opens the local SQLite file on your disk (thread-safe with `check_same_thread=False` + lock).
    - It loads the `sentence-transformers` embedding model into your machine's RAM.
-   - **Incremental Re-indexing:** It runs an "Initial Scan" over your directory. Instead of re-embedding everything blind, it compares file modification times on the disk against the timestamps stored in the SQLite DB. SFS *only* chunks and embeds files that are **new** or have been **modified** since the daemon was last shut down. Files that haven't changed are instantly skipped.
-   - It begins actively watching your files.
+   - It starts the **TCP query server** on `localhost:9749`, ready to serve search requests from the CLI.
+   - **Incremental Re-indexing:** It runs an "Initial Scan" over your directory. Instead of re-embedding everything blind, it compares file modification times (`mtime_ns`) on the disk against the timestamps stored in the SQLite DB. SFS *only* chunks and embeds files that are **new** or have been **modified** since the daemon was last shut down. Files that haven't changed are instantly skipped (~1 microsecond per file).
+   - It starts the **periodic re-scan timer** (every 10 minutes by default).
+   - It begins actively watching your files via `watchdog`.
 
 2. **Editing Code:** You edit `filter.py` and hit "Save".
    - The OS triggers a file-write event.
    - The `watchdog` inside the Daemon notices the change and pauses for 1.5 seconds (debouncing, in case you save multiple times in a row).
    - The Daemon reads `filter.py`, chunks the text.
    - The Daemon runs the text chunks through the Local Model in RAM to get vectors.
-   - The Daemon saves those vectors into the SQLite DB file.
+   - The Daemon saves those vectors into the SQLite DB file (thread-safe).
 
-3. **Searching:** In a separate terminal, you run `uv run yaaos-find "How does the filter work?"`
-   - A *new* Python process spawns.
-   - It loads the Local Model into its RAM, and embeds your question into a vector.
-   - It opens the *exact same* SQLite DB file the Daemon is actively writing to.
-   - It runs a fast nearest-neighbor SQL query to find the chunks that closely match your question vector.
-   - It prints the results and the process shuts down, freeing up its RAM.
+3. **Bulk Copy / Git Checkout:** You copy thousands of files or switch branches.
+   - The OS event buffer may overflow, dropping some file events silently.
+   - The **periodic re-scan** (every 10 minutes) walks the directory, detects the new/changed files via stat comparison, and indexes them automatically.
+   - No manual intervention needed — the re-scan catches what the watcher missed.
+
+4. **Searching:** In a separate terminal, you run `uv run yaaos-find "How does the filter work?"`
+   - A *new* Python process spawns (the CLI).
+   - It connects to the daemon's query server on `localhost:9749` via TCP.
+   - The daemon embeds your query using the model already in memory, runs the hybrid search (vector + keyword + RRF fusion), and sends back results — all in **milliseconds**.
+   - The CLI prints the results and exits. **No model was loaded.** Total time: ~50ms instead of ~2 seconds.
+   - *Fallback:* If the daemon isn't running, the CLI loads the model directly (slower, ~2s first query) and searches the DB file on disk. Same results, just slower startup.
 
 ---
 
@@ -110,9 +142,9 @@ Let's trace a practical example:
 
 When YAAOS ships as a full Linux distribution, you won't be manually starting SFS in a terminal. 
 
-1. **Systemd Service:** SFS will run as a native background `systemd` service (`systemctl enable yaaos-sfs`). It will boot up invisibly alongside the Linux kernel/UI.
+1. **Systemd Service:** SFS will run as a native background `systemd` service (`systemctl enable yaaos-sfs`). It will boot up invisibly alongside the Linux kernel/UI. The query server on `localhost:9749` will be immediately available for any application to search.
 2. **Binary Compilation:** While written in Python, for the final OS release we will likely compile the application using tools like `Nuitka` or `PyInstaller`. This turns the Python scripts into heavily optimized standalone C/C++ executables, drastically reducing CPU/RAM overhead on the system compared to spinning up a virtual environment.
-3. **IDE Integration:** Your code editors (like VS Code SSH) and Terminal AI bots will directly ping the `yaaos-find` executable behind the scenes.
+3. **IDE Integration:** Code editors (VS Code, etc.) and terminal AI bots will connect directly to the daemon's TCP query server (`localhost:9749`) for instant semantic search — no model loading, no CLI overhead. The JSON-over-TCP protocol makes integration trivial from any language.
 
 ---
 
@@ -151,8 +183,10 @@ To understand how aggressively SFS optimizes itself, let's look at a real-world 
 - **What Happens:** Once caught up, the daemon rests completely. It uses zero CPU, sitting quietly waiting for an OS file-write event. SQLite costs zero idle memory.
 
 ### 5. Phase 5: Executing a Search (`yaaos-find`)
-- **Time:** Extremely Fast (< 1 second).
-- **RAM:** High temporarily (~1GB to 2.5GB). The search CLI has to load its own instance of `sentence-transformers` into memory to quickly embed your search query into vectors.
-- **CPU:** Moderate spike. The inference to embed a tiny search query (e.g., "login mechanism") is almost instant, followed by a fast vectorized dot-product search via `sqlite-vec`.
-- **Disk I/O:** High burst. The database is heavily optimized with an HNSW index, doing a rapid nearest-neighbor lookup across the 350 MB database file.
-- **What Happens:** As soon as the results are printed, the CLI process terminates, instantly freeing all the RAM and CPU it used.
+- **Time (daemon running):** Instant (~50ms). The CLI sends a TCP request to the daemon, which already has the model in memory.
+- **Time (daemon not running):** ~2 seconds. The CLI falls back to loading its own model instance.
+- **RAM (daemon running):** Negligible. The CLI is just a thin TCP client — no model loaded.
+- **RAM (daemon not running):** High temporarily (~1GB to 2.5GB) for loading `sentence-transformers`.
+- **CPU:** Minimal. The daemon embeds the tiny search query and runs a fast vectorized dot-product search via `sqlite-vec`.
+- **Disk I/O:** Moderate burst. The database does a rapid nearest-neighbor lookup across the indexed vectors.
+- **What Happens:** The CLI connects to daemon on `localhost:9749`, gets results, prints them, and exits. If daemon is down, it loads the model, queries the DB directly, then exits.

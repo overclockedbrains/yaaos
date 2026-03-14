@@ -75,17 +75,24 @@ uv run yaaos-sfs
 ```
 
 **What happens?**
-1. **Initial Scan:** SFS heavily filters your tree, finds allowed files, and compares them with the SQLite DB. Missing/outdated files are batched and embedded.
-2. **Watchdog Active:** The daemon continuously listens to file creations, saves, and deletions. Uses a debouncer (e.g. 1500ms) so wildly hitting `Ctrl+S` doesn't saturate the indexer.
-3. *Press `Ctrl+C` to elegantly spin down the daemon and close the DB.*
+1. **Query Server:** A TCP query server starts on `localhost:9749`, ready to serve instant searches from the CLI.
+2. **Initial Scan:** SFS heavily filters your tree, finds allowed files, and compares them with the SQLite DB. Missing/outdated files are batched and embedded.
+3. **Watchdog Active:** The daemon continuously listens to file creations, saves, and deletions. Uses a debouncer (e.g. 1500ms) so wildly hitting `Ctrl+S` doesn't saturate the indexer.
+4. **Periodic Re-scan:** Every 10 minutes (configurable via `rescan_interval_min`), the daemon re-scans the directory to catch files the OS watcher may have missed (e.g. bulk copies, network drive syncs, or OS event buffer overflows).
+5. *Press `Ctrl+C` to elegantly spin down the daemon and close the DB.*
 
-## 🔍 Manually Checking It Out (Searching)
+## 🔍 Searching (Instant via Daemon)
 
-SFS provides a command-line utility to query your newly indexed semantic filesystem. You can manually test it while the daemon runs:
+SFS provides a command-line utility to query your indexed semantic filesystem:
 
 ```bash
-# General search querying against your codebase
+# Instant search — routes through the running daemon (no model loading)
 uv run yaaos-find "How does the file filter pipeline work?"
+
+# Check daemon and index status
+uv run yaaos-find --status
 ```
 
-This will load the embedding provider, embed your text query, and perform a rapid cosine similarity search via `sqlite-vec` to return the most relevant file chunks!
+When the daemon is running, queries are **instant** — the CLI sends your query over TCP to the daemon, which already has the embedding model in memory. No model loading overhead.
+
+If the daemon is not running, the CLI gracefully falls back to loading the model directly (slower first query, same results).
