@@ -60,12 +60,14 @@ def hybrid_search(
     results = []
     for chunk_id, score in ranked:
         r = result_data[chunk_id]
-        results.append(SearchResult(
-            file_path=r["path"],
-            filename=r["filename"],
-            chunk_text=r["chunk_text"],
-            chunk_index=r["chunk_index"],
-            score=score,
-        ))
+        results.append(
+            SearchResult(
+                file_path=r["path"],
+                filename=r["filename"],
+                chunk_text=r["chunk_text"],
+                chunk_index=r["chunk_index"],
+                score=score,
+            )
+        )
 
     return results

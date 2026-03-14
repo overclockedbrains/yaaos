@@ -26,15 +26,37 @@ class Config:
     embedding_dims: int = 384
     chunk_size: int = 512
     chunk_overlap: int = 50
-    supported_extensions: list[str] = field(default_factory=lambda: [
-        ".txt", ".md", ".py", ".js", ".ts", ".jsx", ".tsx",
-        ".json", ".yaml", ".yml", ".toml",
-        ".sh", ".bash", ".zsh",
-        ".rs", ".go", ".c", ".h", ".cpp", ".hpp",
-        ".java", ".rb", ".php",
-        ".css", ".html", ".xml",
-        ".pdf",
-    ])
+    supported_extensions: list[str] = field(
+        default_factory=lambda: [
+            ".txt",
+            ".md",
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".rs",
+            ".go",
+            ".c",
+            ".h",
+            ".cpp",
+            ".hpp",
+            ".java",
+            ".rb",
+            ".php",
+            ".css",
+            ".html",
+            ".xml",
+            ".pdf",
+        ]
+    )
 
     # OpenAI settings (optional)
     openai_api_key: str | None = None

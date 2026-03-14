@@ -81,10 +81,7 @@ class SFSHandler(FileSystemEventHandler):
 
 def _initial_scan(handler: SFSHandler, watch_dir: Path):
     """Index all existing files on startup."""
-    files = [
-        f for f in watch_dir.rglob("*")
-        if handler._should_index(f)
-    ]
+    files = [f for f in watch_dir.rglob("*") if handler._should_index(f)]
     if not files:
         log.info("No files to index in initial scan.")
         return
@@ -100,6 +97,7 @@ def _initial_scan(handler: SFSHandler, watch_dir: Path):
 def _get_provider(config: Config) -> EmbeddingProvider:
     if config.embedding_provider == "openai":
         from .providers.openai_provider import OpenAIEmbeddingProvider
+
         if not config.openai_api_key:
             log.error("OpenAI provider selected but no API key configured.")
             sys.exit(1)
@@ -110,7 +108,7 @@ def _get_provider(config: Config) -> EmbeddingProvider:
 def main():
     """Entry point for the yaaos-sfs daemon."""
     config = Config.load()
-    log.info(f"YAAOS Semantic File System v0.1.0")
+    log.info("YAAOS Semantic File System v0.1.0")
     log.info(f"Watching: {config.watch_dir}")
     log.info(f"Database: {config.db_path}")
     log.info(f"Provider: {config.embedding_provider} ({config.embedding_model})")
