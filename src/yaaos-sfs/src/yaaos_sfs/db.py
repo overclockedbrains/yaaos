@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import struct
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,7 +27,8 @@ class Database:
     def __init__(self, db_path: Path, embedding_dims: int = 384):
         self.db_path = db_path
         self.embedding_dims = embedding_dims
-        self.conn = sqlite3.connect(str(db_path))
+        self._lock = threading.Lock()
+        self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.enable_load_extension(True)
         sqlite_vec.load(self.conn)
@@ -98,9 +100,10 @@ class Database:
         except OSError:
             return True
 
-        row = self.conn.execute(
-            "SELECT mtime_ns, size_bytes, content_hash FROM files WHERE path = ?", (str(path),)
-        ).fetchone()
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT mtime_ns, size_bytes, content_hash FROM files WHERE path = ?", (str(path),)
+            ).fetchone()
 
         if row is None:
             return True
@@ -123,123 +126,132 @@ class Database:
         content_hash = self._xxhash_file(path)
         now = datetime.now(timezone.utc).isoformat()
 
-        # Delete old data if exists
-        old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
-        if old:
-            file_id = old["id"]
-            # Get old chunk IDs to remove from vec table
-            old_chunks = self.conn.execute(
-                "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
-            ).fetchall()
-            for chunk in old_chunks:
-                self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
-            self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
-            self.conn.execute(
-                """UPDATE files SET filename=?, extension=?, size_bytes=?, mtime_ns=?,
-                   modified_at=?, indexed_at=?, content_hash=?, chunk_count=?
-                   WHERE id=?""",
-                (
-                    path.name,
-                    path.suffix,
-                    stat.st_size,
-                    mtime_ns,
-                    datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                    now,
-                    content_hash,
-                    len(chunks),
-                    file_id,
-                ),
-            )
-        else:
-            cursor = self.conn.execute(
-                """INSERT INTO files (path, filename, extension, size_bytes, mtime_ns,
-                   modified_at, indexed_at, content_hash, chunk_count)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    str(path),
-                    path.name,
-                    path.suffix,
-                    stat.st_size,
-                    mtime_ns,
-                    datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
-                    now,
-                    content_hash,
-                    len(chunks),
-                ),
-            )
-            file_id = cursor.lastrowid
+        with self._lock:
+            # Delete old data if exists
+            old = self.conn.execute(
+                "SELECT id FROM files WHERE path = ?", (str(path),)
+            ).fetchone()
+            if old:
+                file_id = old["id"]
+                # Get old chunk IDs to remove from vec table
+                old_chunks = self.conn.execute(
+                    "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
+                ).fetchall()
+                for chunk in old_chunks:
+                    self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
+                self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
+                self.conn.execute(
+                    """UPDATE files SET filename=?, extension=?, size_bytes=?, mtime_ns=?,
+                       modified_at=?, indexed_at=?, content_hash=?, chunk_count=?
+                       WHERE id=?""",
+                    (
+                        path.name,
+                        path.suffix,
+                        stat.st_size,
+                        mtime_ns,
+                        datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                        now,
+                        content_hash,
+                        len(chunks),
+                        file_id,
+                    ),
+                )
+            else:
+                cursor = self.conn.execute(
+                    """INSERT INTO files (path, filename, extension, size_bytes, mtime_ns,
+                       modified_at, indexed_at, content_hash, chunk_count)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        str(path),
+                        path.name,
+                        path.suffix,
+                        stat.st_size,
+                        mtime_ns,
+                        datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+                        now,
+                        content_hash,
+                        len(chunks),
+                    ),
+                )
+                file_id = cursor.lastrowid
 
-        # Insert new chunks
-        for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
-            cursor = self.conn.execute(
-                """INSERT INTO chunks (file_id, chunk_index, chunk_text, token_count)
-                   VALUES (?, ?, ?, ?)""",
-                (file_id, i, chunk_text, len(chunk_text.split())),
-            )
-            chunk_id = cursor.lastrowid
-            self.conn.execute(
-                "INSERT INTO chunks_vec (id, embedding) VALUES (?, ?)",
-                (chunk_id, _serialize_vector(embedding)),
-            )
+            # Insert new chunks
+            for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
+                cursor = self.conn.execute(
+                    """INSERT INTO chunks (file_id, chunk_index, chunk_text, token_count)
+                       VALUES (?, ?, ?, ?)""",
+                    (file_id, i, chunk_text, len(chunk_text.split())),
+                )
+                chunk_id = cursor.lastrowid
+                self.conn.execute(
+                    "INSERT INTO chunks_vec (id, embedding) VALUES (?, ?)",
+                    (chunk_id, _serialize_vector(embedding)),
+                )
 
-        self.conn.commit()
+            self.conn.commit()
 
     def remove_file(self, path: Path):
         """Remove a file and all its chunks from the index."""
-        old = self.conn.execute("SELECT id FROM files WHERE path = ?", (str(path),)).fetchone()
-        if old:
-            file_id = old["id"]
-            old_chunks = self.conn.execute(
-                "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
-            ).fetchall()
-            for chunk in old_chunks:
-                self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
-            self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
-            self.conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
-            self.conn.commit()
+        with self._lock:
+            old = self.conn.execute(
+                "SELECT id FROM files WHERE path = ?", (str(path),)
+            ).fetchone()
+            if old:
+                file_id = old["id"]
+                old_chunks = self.conn.execute(
+                    "SELECT id FROM chunks WHERE file_id = ?", (file_id,)
+                ).fetchall()
+                for chunk in old_chunks:
+                    self.conn.execute("DELETE FROM chunks_vec WHERE id = ?", (chunk["id"],))
+                self.conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
+                self.conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+                self.conn.commit()
 
     def search_vector(self, query_embedding: list[float], top_k: int = 20) -> list[dict]:
         """Search by vector similarity."""
-        rows = self.conn.execute(
-            """
-            SELECT v.id, v.distance,
-                   c.chunk_text, c.chunk_index, c.file_id,
-                   f.path, f.filename
-            FROM chunks_vec v
-            JOIN chunks c ON c.id = v.id
-            JOIN files f ON f.id = c.file_id
-            WHERE v.embedding MATCH ?
-              AND k = ?
-            ORDER BY v.distance
-            """,
-            (_serialize_vector(query_embedding), top_k),
-        ).fetchall()
+        with self._lock:
+            rows = self.conn.execute(
+                """
+                SELECT v.id, v.distance,
+                       c.chunk_text, c.chunk_index, c.file_id,
+                       f.path, f.filename
+                FROM chunks_vec v
+                JOIN chunks c ON c.id = v.id
+                JOIN files f ON f.id = c.file_id
+                WHERE v.embedding MATCH ?
+                  AND k = ?
+                ORDER BY v.distance
+                """,
+                (_serialize_vector(query_embedding), top_k),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def search_fts(self, query: str, top_k: int = 20) -> list[dict]:
         """Search by keyword (FTS5 BM25)."""
         # Escape special FTS5 characters
         safe_query = query.replace('"', '""')
-        rows = self.conn.execute(
-            """
-            SELECT c.id, rank AS score,
-                   c.chunk_text, c.chunk_index, c.file_id,
-                   f.path, f.filename
-            FROM chunks_fts fts
-            JOIN chunks c ON c.id = fts.rowid
-            JOIN files f ON f.id = c.file_id
-            WHERE chunks_fts MATCH ?
-            ORDER BY rank
-            LIMIT ?
-            """,
-            (f'"{safe_query}"', top_k),
-        ).fetchall()
+        with self._lock:
+            rows = self.conn.execute(
+                """
+                SELECT c.id, rank AS score,
+                       c.chunk_text, c.chunk_index, c.file_id,
+                       f.path, f.filename
+                FROM chunks_fts fts
+                JOIN chunks c ON c.id = fts.rowid
+                JOIN files f ON f.id = c.file_id
+                WHERE chunks_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (f'"{safe_query}"', top_k),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def get_stats(self) -> dict:
         """Get index statistics."""
-        files = self.conn.execute("SELECT COUNT(*) as n FROM files").fetchone()["n"]
-        chunks = self.conn.execute("SELECT COUNT(*) as n FROM chunks").fetchone()["n"]
+        with self._lock:
+            files = self.conn.execute("SELECT COUNT(*) as n FROM files").fetchone()["n"]
+            chunks = self.conn.execute("SELECT COUNT(*) as n FROM chunks").fetchone()["n"]
         db_size = self.db_path.stat().st_size if self.db_path.exists() else 0
         return {
             "files": files,
@@ -248,7 +260,8 @@ class Database:
         }
 
     def close(self):
-        self.conn.close()
+        with self._lock:
+            self.conn.close()
 
     @staticmethod
     def _xxhash_file(path: Path) -> str:

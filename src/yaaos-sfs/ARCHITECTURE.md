@@ -30,7 +30,7 @@ A common point of confusion is over things like the "Database" or the "AI Model"
 
 1. **The Database (`sqlite-vec`)**
    - **Where it runs:** It runs inside the Python process of whoever calls it. There is **no separate SQL server** (like PostgreSQL or MySQL) running in the background.
-   - **How it works:** `sqlite-vec` acts exactly like standard SQLite but with vector math support. It reads and writes directly to a file stored locally on your disk (usually around `~/.yaaos/sfs.db`). 
+   - **How it works:** `sqlite-vec` acts exactly like standard SQLite but with vector math support. It reads and writes directly to a file stored locally on your disk (usually around `~/.local/share/yaaos/sfs.db`). 
    - Both the Daemon and the Finder CLI access this exact same file directly.
 
 2. **The Local Embedding Model (`sentence-transformers`)**
