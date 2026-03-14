@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import socket
 import struct
-from dataclasses import dataclass
 
 from .search import SearchResult
 
