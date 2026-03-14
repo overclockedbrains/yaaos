@@ -8,6 +8,7 @@ Finalized documents driving development.
 - [tech_stack.md](docs/tech_stack.md) — Every technology choice with rationale (Arch, Python/Rust, sqlite-vec, Ollama, etc.)
 - [mvp_scope.md](docs/mvp_scope.md) — MVP scope: Semantic File System (project structure, DB schema, algorithms, success criteria)
 - [roadmap.md](docs/roadmap.md) — Full 6-phase roadmap with milestones and dependencies
+- [sfs_v2_plan.md](docs/sfs_v2_plan.md) — SFS v2 plan: production-ready with filtering, multi-format, smart chunking, scale
 
 ## Drafts (Brainstorming)
 
@@ -18,8 +19,9 @@ Early brainstorming documents. Kept for historical context.
 
 ## Project Status
 
-**Current Phase:** Phase 1 — Semantic File System (MVP)
-**Phase 1 Progress:** 8/9 milestones complete (tests & polish remaining)
+**Current Phase:** Phase 1.5 — SFS v2 (Production-Ready)
+**Phase 1 (MVP):** Complete (8/9 milestones, tests remaining)
+**Phase 1.5 (v2):** Planning complete, implementation pending
 **Code Location:** `src/yaaos-sfs/`
 
 ### Quick Reference
@@ -30,8 +32,9 @@ Early brainstorming documents. Kept for historical context.
 ├── docs/
 │   ├── architecture.md   ← system design
 │   ├── tech_stack.md     ← technology choices
-│   ├── mvp_scope.md      ← what we're building now
-│   └── roadmap.md        ← the full 6-phase plan
+│   ├── mvp_scope.md      ← Phase 1 MVP scope
+│   ├── roadmap.md        ← the full 6-phase plan
+│   └── sfs_v2_plan.md    ← SFS v2 production plan
 └── drafts/
     ├── 01_*.md           ← original brainstorm
     └── 02_*.md           ← audiences & use cases
