@@ -30,5 +30,5 @@
 
 ### 📝 Personal TODOs
 
-- [ ] Github ci needs upgrade
+- [ ] Github ci needs upgrade - currently only has sfs
 - [ ] Can YAAOS take current screen details and use it? (Answer: yes via D-Bus, /proc, headless browser CDP, adb uiautomator — no vision model needed for most cases)
