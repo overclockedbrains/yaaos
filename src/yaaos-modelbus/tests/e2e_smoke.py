@@ -53,7 +53,7 @@ def main():
         if ollama_ok:
             print("  Ollama is reachable — running full tests")
         else:
-            print(f"  Ollama not reachable — skipping Ollama-dependent tests")
+            print("  Ollama not reachable — skipping Ollama-dependent tests")
             print(f"  (Error: {ollama_health.get('error', 'unknown')})")
 
         # 2. List models
