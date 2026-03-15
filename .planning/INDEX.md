@@ -9,6 +9,7 @@ Finalized documents driving development.
 - [mvp_scope.md](docs/mvp_scope.md) — MVP scope: Semantic File System (project structure, DB schema, algorithms, success criteria)
 - [roadmap.md](docs/roadmap.md) — Full 6-phase roadmap with milestones and dependencies
 - [sfs_v2_plan.md](docs/sfs_v2_plan.md) — SFS v2 plan: production-ready with filtering, multi-format, smart chunking, scale
+- [phase2_model_bus_plan.md](docs/phase2_model_bus_plan.md) — Phase 2: Model Bus — unified AI runtime, pluggable providers, resource management, streaming
 
 ## Drafts (Brainstorming)
 
@@ -19,7 +20,7 @@ Early brainstorming documents. Kept for historical context.
 
 ## Project Status
 
-**Current Phase:** Phase 2 — Model Bus (next up)
+**Current Phase:** Phase 2 — Model Bus (planned, ready for implementation)
 **Phase 1 (MVP):** Complete
 **Phase 1.5 (SFS v2):** Complete (2026-03-15) — v0.2.0, 136 tests passing
 **Code Location:** `src/yaaos-sfs/`
@@ -34,7 +35,8 @@ Early brainstorming documents. Kept for historical context.
 │   ├── tech_stack.md     ← technology choices
 │   ├── mvp_scope.md      ← Phase 1 MVP scope
 │   ├── roadmap.md        ← the full 6-phase plan
-│   └── sfs_v2_plan.md    ← SFS v2 production plan
+│   ├── sfs_v2_plan.md    ← SFS v2 production plan
+│   └── phase2_model_bus_plan.md ← Phase 2 Model Bus plan
 └── drafts/
     ├── 01_*.md           ← original brainstorm
     └── 02_*.md           ← audiences & use cases

@@ -263,14 +263,273 @@ SFS is not just a file search tool — it is the **semantic memory layer** that 
 
 ---
 
-## 6. Development Phases
+## 6. Full System Integration (Mermaid)
 
-| Phase | Component | Deliverable | Status |
-|-------|-----------|------------|--------|
-| **Phase 1** | Semantic File System | Daemon + indexing + CLI search | Done |
-| **Phase 1.5** | SFS v2 | Multi-format, smart chunking, GPU, 136 tests | Done |
-| **Phase 2** | Model Bus | Pluggable provider system + config | Next |
-| **Phase 3** | SystemAgentd | Agent supervisor + first agents | Planned |
-| **Phase 4** | Agentic Shell | Intent-driven shell prototype | Planned |
-| **Phase 5** | Desktop Environment | Context-driven workspaces | Planned |
-| **Phase 6** | Distro | archiso build → bootable ISO | Planned |
+### How Every Layer Connects
+
+```mermaid
+graph TB
+    subgraph USER["👤 User"]
+        terminal["Terminal / aish"]
+        desktop["Desktop Environment"]
+        apps["GUI Apps"]
+    end
+
+    subgraph L5["Layer 5 — Desktop Environment"]
+        ctx_mgr["Context Workspace Manager"]
+        win_mgr["AI Window Manager<br/>(sway/river + Wayland)"]
+        notif["Agent Notification System"]
+    end
+
+    subgraph L4["Layer 4 — Agentic Shell (aish)"]
+        intent["Intent Parser<br/>(NL → command plan)"]
+        planner["Command Planner"]
+        audit["Audit Display<br/>(user confirms)"]
+        executor["Shell Executor<br/>(bash/nushell)"]
+        session["Session Memory<br/>(infinite recall)"]
+    end
+
+    subgraph L3["Layer 3 — SystemAgentd"]
+        supervisor["SystemAgentd Supervisor<br/>/run/yaaos/agentbus.sock"]
+        log_agent["Log-Agent<br/>journald analysis"]
+        crash_agent["Crash-Agent<br/>core dump analysis"]
+        net_agent["Net-Agent<br/>network anomaly"]
+        res_agent["Resource-Agent<br/>CPU/RAM prediction"]
+        sfs_agent["FS-Agent<br/>SFS indexing daemon"]
+    end
+
+    subgraph L2["Layer 2 — Semantic File System"]
+        watcher["File Watcher<br/>(inotify)"]
+        pipeline["Processing Pipeline<br/>filter → extract → chunk"]
+        search["Search Engine<br/>3-signal RRF hybrid"]
+        vecdb[("sqlite-vec<br/>vectors + FTS5 + metadata")]
+        sfs_sock["SFS Query Server<br/>/run/yaaos/sfs.sock"]
+    end
+
+    subgraph L1["Layer 1 — Model Bus"]
+        mb_api["Model Bus API<br/>/run/yaaos/modelbus.sock<br/>JSON-RPC 2.0 + NDJSON"]
+        router["Request Router<br/>provider/model routing"]
+        res_mgr["Resource Manager<br/>VRAM/RAM monitor<br/>idle eviction"]
+        stream["Streaming Proxy"]
+
+        subgraph providers["Providers"]
+            ollama["Ollama<br/>(local GPU)"]
+            openai["OpenAI<br/>(cloud)"]
+            anthropic["Anthropic<br/>(cloud)"]
+            voyage["Voyage<br/>(embed)"]
+            local_st["sentence-transformers<br/>(direct local)"]
+        end
+    end
+
+    subgraph L0["Layer 0 — Base OS (Arch Linux)"]
+        kernel["Linux Kernel<br/>FUSE3 · inotify · cgroups"]
+        systemd["systemd<br/>service manager · journald · D-Bus"]
+        gpu["GPU Stack<br/>CUDA / ROCm / Vulkan"]
+        pacman["pacman + YAAOS repo"]
+        ollama_svc["ollama.service<br/>(model runtime)"]
+    end
+
+    %% User → Layer 5
+    terminal --> intent
+    desktop --> ctx_mgr
+    apps --> ctx_mgr
+
+    %% Layer 5 → Layer 4
+    ctx_mgr --> intent
+    ctx_mgr --> sfs_sock
+    notif --> supervisor
+
+    %% Layer 4 → lower layers
+    intent -->|"embed() for NL understanding"| mb_api
+    intent -->|"generate() for planning"| mb_api
+    planner --> executor
+    audit --> planner
+    session -->|"semantic recall"| sfs_sock
+    intent --> planner
+    executor -->|"runs actual commands"| kernel
+
+    %% Layer 3 → lower layers
+    supervisor -->|"manages as systemd units"| systemd
+    log_agent -->|"generate() for analysis"| mb_api
+    crash_agent -->|"generate() for diagnosis"| mb_api
+    net_agent -->|"generate() for anomaly detection"| mb_api
+    res_agent -->|"embed() + generate()"| mb_api
+    sfs_agent --> watcher
+    log_agent -->|"semantic context"| sfs_sock
+    crash_agent -->|"find related code"| sfs_sock
+
+    %% Layer 2 → lower layers
+    watcher --> pipeline
+    pipeline -->|"embed() via socket"| mb_api
+    pipeline --> vecdb
+    search --> vecdb
+    sfs_sock --> search
+    search -->|"embed_query()"| mb_api
+    watcher -->|"inotify events"| kernel
+
+    %% Layer 1 internals
+    mb_api --> router
+    router --> res_mgr
+    router --> stream
+    stream --> ollama
+    stream --> openai
+    stream --> anthropic
+    stream --> voyage
+    stream --> local_st
+    res_mgr -->|"VRAM monitoring"| gpu
+    ollama -->|"HTTP API"| ollama_svc
+
+    %% Layer 0 internals
+    ollama_svc --> gpu
+    ollama_svc --> systemd
+    gpu --> kernel
+
+    %% Styling
+    classDef layer0 fill:#1a1a2e,stroke:#e94560,color:#fff
+    classDef layer1 fill:#16213e,stroke:#0f3460,color:#fff
+    classDef layer2 fill:#0f3460,stroke:#533483,color:#fff
+    classDef layer3 fill:#533483,stroke:#e94560,color:#fff
+    classDef layer4 fill:#2d4059,stroke:#ea5455,color:#fff
+    classDef layer5 fill:#3c1642,stroke:#f6b93b,color:#fff
+    classDef user_style fill:#f6b93b,stroke:#333,color:#000
+    classDef provider fill:#1b1b2f,stroke:#e43f5a,color:#fff
+
+    class kernel,systemd,gpu,pacman,ollama_svc layer0
+    class mb_api,router,res_mgr,stream layer1
+    class ollama,openai,anthropic,voyage,local_st provider
+    class watcher,pipeline,search,vecdb,sfs_sock layer2
+    class supervisor,log_agent,crash_agent,net_agent,res_agent,sfs_agent layer3
+    class intent,planner,audit,executor,session layer4
+    class ctx_mgr,win_mgr,notif layer5
+    class terminal,desktop,apps user_style
+```
+
+### systemd Service Dependency Chain (Boot Order)
+
+```mermaid
+graph LR
+    subgraph boot["Arch Linux Boot"]
+        kernel_boot["kernel + initramfs"]
+        systemd_init["systemd init"]
+    end
+
+    subgraph gpu_stack["GPU Init"]
+        nvidia["nvidia.ko / amdgpu.ko"]
+        vulkan["Vulkan / CUDA runtime"]
+    end
+
+    subgraph yaaos_services["YAAOS Services (systemd units)"]
+        ollama_s["ollama.service<br/>Type=notify"]
+        modelbus_s["yaaos-modelbus.service<br/>Type=notify<br/>After=ollama.service"]
+        sfs_s["yaaos-sfs.service<br/>Type=notify<br/>After=yaaos-modelbus.service"]
+        agentd_s["systemagentd.service<br/>Type=notify<br/>After=yaaos-sfs, yaaos-modelbus"]
+        agents_s["systemagentd-agent@*.service<br/>After=systemagentd.service"]
+    end
+
+    subgraph user_session["User Session"]
+        login["Login Manager<br/>(greetd / SDDM)"]
+        compositor["Wayland Compositor<br/>(sway / river)"]
+        aish_s["aish (shell)<br/>user service"]
+        de_s["YAAOS Desktop<br/>user service"]
+    end
+
+    kernel_boot --> systemd_init
+    systemd_init --> nvidia
+    nvidia --> vulkan
+    vulkan --> ollama_s
+    ollama_s --> modelbus_s
+    modelbus_s --> sfs_s
+    modelbus_s --> agentd_s
+    sfs_s --> agentd_s
+    agentd_s --> agents_s
+    systemd_init --> login
+    login --> compositor
+    compositor --> aish_s
+    compositor --> de_s
+    agentd_s -.->|"D-Bus signals"| de_s
+    aish_s -.->|"Unix socket"| modelbus_s
+    de_s -.->|"Unix socket"| sfs_s
+```
+
+### Arch Linux ISO Integration (Phase 6)
+
+How all of this becomes a bootable OS:
+
+```mermaid
+graph TB
+    subgraph build["Build Pipeline (archiso)"]
+        profile["archiso profile<br/>/etc/yaaos-archiso/"]
+        pkg_list["packages.x86_64<br/>base packages + YAAOS"]
+        yaaos_repo["Custom pacman repo<br/>yaaos-modelbus<br/>yaaos-sfs<br/>yaaos-agentd<br/>yaaos-shell<br/>yaaos-desktop"]
+        overlay["airootfs overlay<br/>systemd units<br/>default configs<br/>first-boot scripts"]
+        iso["YAAOS ISO<br/>(archiso mkarchiso)"]
+    end
+
+    subgraph install["Installation"]
+        live_usb["Boot from USB<br/>(live YAAOS demo)"]
+        calamares["Calamares Installer<br/>disk · locale · user"]
+        first_boot["First Boot Wizard"]
+    end
+
+    subgraph first_boot_steps["First Boot Experience"]
+        gpu_detect["1. GPU Auto-Detection<br/>NVIDIA → CUDA driver<br/>AMD → ROCm<br/>Intel → Vulkan only"]
+        model_pick["2. Model Selection<br/>Pick LLM based on VRAM<br/>4GB → phi3:mini<br/>8GB → llama3.2-8B<br/>CPU-only → qwen2:1.5b"]
+        model_dl["3. Model Download<br/>ollama pull phi3:mini<br/>ollama pull nomic-embed-text"]
+        sfs_setup["4. SFS Initial Index<br/>Point to ~/Documents<br/>First scan runs"]
+        done["5. Ready<br/>All services running<br/>Open aish terminal"]
+    end
+
+    profile --> pkg_list
+    pkg_list --> yaaos_repo
+    yaaos_repo --> overlay
+    overlay --> iso
+    iso --> live_usb
+    live_usb --> calamares
+    calamares --> first_boot
+    first_boot --> gpu_detect
+    gpu_detect --> model_pick
+    model_pick --> model_dl
+    model_dl --> sfs_setup
+    sfs_setup --> done
+```
+
+### YAAOS Package Structure (pacman)
+
+Each YAAOS layer ships as a separate pacman package with proper dependency chains:
+
+```
+yaaos-base          (metapackage — pulls everything)
+├── yaaos-modelbus  (Model Bus daemon + CLI + providers)
+│   ├── ollama      (from AUR/community)
+│   └── python-httpx, python-pynvml, ...
+├── yaaos-sfs       (Semantic File System daemon + CLI)
+│   ├── yaaos-modelbus  (for embed via Bus)
+│   └── python-sentence-transformers, sqlite-vec, ...
+├── yaaos-agentd    (SystemAgentd + built-in agents)
+│   ├── yaaos-modelbus
+│   └── yaaos-sfs
+├── yaaos-shell     (aish — Agentic Shell)
+│   ├── yaaos-modelbus
+│   ├── yaaos-sfs
+│   └── nushell (base shell)
+└── yaaos-desktop   (Desktop Environment)
+    ├── yaaos-shell
+    ├── yaaos-agentd
+    └── sway / river (Wayland compositor)
+```
+
+Each package includes its own systemd unit files, default configs in `/etc/yaaos/`, and is independently installable. A user could run `pacman -S yaaos-sfs yaaos-modelbus` on any existing Arch install to get just the semantic FS + model bus without the full DE.
+
+---
+
+## 7. Development Phases
+
+| Phase | Component | pacman Package | Deliverable | Status |
+|-------|-----------|---------------|------------|--------|
+| **Phase 1** | Semantic File System | `yaaos-sfs` | Daemon + indexing + CLI search | Done |
+| **Phase 1.5** | SFS v2 | `yaaos-sfs` | Multi-format, smart chunking, GPU, 136 tests | Done |
+| **Phase 2** | Model Bus | `yaaos-modelbus` | Unified AI runtime, pluggable providers, VRAM mgmt | Planned |
+| **Phase 3** | SystemAgentd | `yaaos-agentd` | Agent supervisor + first agents | Planned |
+| **Phase 4** | Agentic Shell | `yaaos-shell` | Intent-driven shell prototype | Planned |
+| **Phase 5** | Desktop Environment | `yaaos-desktop` | Context-driven workspaces | Planned |
+| **Phase 6** | Distro | `yaaos-base` | archiso build → bootable ISO | Planned |

@@ -40,7 +40,13 @@
 
 ## In Progress
 
-- Nothing currently — ready for next phase
+- **Phase 2: Model Bus** — Planned, ready for implementation
+  - Plan: `.planning/docs/phase2_model_bus_plan.md`
+  - 5 sub-phases: A (Core Infrastructure) → B (Providers) → C (Cloud + CLI) → D (Resources) → E (SFS Migration)
+  - asyncio Unix socket daemon, JSON-RPC 2.0, NDJSON streaming
+  - Pluggable providers: Ollama, OpenAI, Anthropic, Voyage, local sentence-transformers
+  - Resource-aware model loading (VRAM/RAM checks, idle eviction)
+  - Target: 145+ tests
 
 ## Future
 
@@ -56,6 +62,7 @@
 |------|-------|
 | SFS source | `src/yaaos-sfs/src/yaaos_sfs/` |
 | SFS v2 plan | `.planning/docs/sfs_v2_plan.md` |
+| Model Bus plan | `.planning/docs/phase2_model_bus_plan.md` |
 | Architecture | `.planning/docs/architecture.md` |
 | Roadmap | `.planning/docs/roadmap.md` |
 | Planning index | `.planning/INDEX.md` |
