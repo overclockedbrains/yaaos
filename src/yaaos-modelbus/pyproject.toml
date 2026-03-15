@@ -1,0 +1,58 @@
+[project]
+name = "yaaos-modelbus"
+version = "0.1.0"
+description = "YAAOS Model Bus — unified AI inference daemon with pluggable providers"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "orjson>=3.10",
+    "psutil>=5.9",
+    "structlog>=24.0",
+    "click>=8.0",
+    "rich>=13.0",
+    "tomli>=2.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.40"]
+voyage = ["voyageai>=0.3"]
+local = ["sentence-transformers>=3.0"]
+nvidia = ["pynvml>=12.0"]
+systemd = ["sdnotify>=0.3"]
+all = ["yaaos-modelbus[openai,anthropic,voyage,local,nvidia,systemd]"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.5"]
+
+[project.scripts]
+yaaos-bus = "yaaos_modelbus.cli:main"
+yaaos-modelbusd = "yaaos_modelbus.daemon:main"
+
+[project.entry-points."yaaos.modelbus.providers"]
+ollama = "yaaos_modelbus.providers.ollama:OllamaProvider"
+openai = "yaaos_modelbus.providers.openai:OpenAIProvider"
+anthropic = "yaaos_modelbus.providers.anthropic:AnthropicProvider"
+voyage = "yaaos_modelbus.providers.voyage:VoyageProvider"
+local = "yaaos_modelbus.providers.local:LocalProvider"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.5"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: full-stack integration tests requiring external services",
+]

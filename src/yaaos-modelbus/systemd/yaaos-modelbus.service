@@ -1,0 +1,45 @@
+[Unit]
+Description=YAAOS Model Bus — Unified AI Inference Daemon
+Documentation=https://github.com/Aman-Coding-Bamzii/yaaos
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/yaaos-modelbusd
+RuntimeDirectory=yaaos
+RuntimeDirectoryMode=0755
+
+# Graceful shutdown: send SIGTERM, wait 30s for drain, then SIGKILL
+KillMode=mixed
+TimeoutStopSec=30
+
+# Watchdog: daemon must ping within 60s or systemd restarts it
+WatchdogSec=60
+NotifyAccess=all
+
+# Restart on failure with backoff
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=4096
+MemoryMax=8G
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/yaaos
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=yaaos-modelbus
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
