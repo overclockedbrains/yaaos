@@ -17,3 +17,9 @@
 
 ### 📊 Fingertip Management
 - [ ] **Dashboard/CLI:** Monitor all your agent daemons, containers, and system resources instantly from one place.
+
+- [x] Phase 2 (Model Bus) — implemented, verified, manually tested end-to-end (2026-03-15)
+- [ ] Phase 3 (SystemAgentd) — next up
+- [ ] github ci needs upgrade
+
+- I want a reality check if yaaos will be able to execute these things or not "Setup a basic android app repo with latest tech stack and install any andoird studio things required and up it and run it on emulator and try accessing it and may be play around with the emulated app" - This is what I want finally a os which can do this.

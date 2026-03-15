@@ -13,7 +13,7 @@
 Phase 1 ──▶ Phase 1.5 ──▶ Phase 2 ──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 ──▶ Phase 6
   SFS         SFS v2       Model       System      Agentic      Desktop     Arch
  (MVP)      (Production)    Bus        Agentd       Shell         DE        ISO
-  ✓            ✓
+  ✓            ✓            ✓
 ```
 
 ---
@@ -78,30 +78,37 @@ SFS is not just a search tool — it is the **semantic memory layer** that every
 
 ---
 
-## Phase 2: Model Bus (Unified AI Runtime) ← NEXT
+## Phase 2: Model Bus (Unified AI Runtime) — DONE
 
 **Goal:** A single API that all YAAOS components use for AI inference, with pluggable providers.
 
-| Milestone | Deliverable |
-|-----------|-------------|
-| 2.1 | Model Bus daemon (Unix socket, JSON-RPC) |
-| 2.2 | Ollama provider (embedding + generation) |
-| 2.3 | OpenAI provider |
-| 2.4 | Anthropic provider |
-| 2.5 | Provider routing + config (`providers.toml`) |
-| 2.6 | Resource-aware model loading (VRAM/RAM checks) |
-| 2.7 | Migrate SFS to use Model Bus instead of direct embedding |
+**Completed:** 2026-03-15 | **Version:** 0.1.0 | **Tests:** 173 passing
 
-**Success Criteria:**
+| Milestone | Deliverable | Status |
+|-----------|-------------|--------|
+| 2.1 | Model Bus daemon (asyncio Unix socket, JSON-RPC 2.0, NDJSON) | Done |
+| 2.2 | Ollama provider (embedding + generation + chat, streaming) | Done |
+| 2.3 | OpenAI provider (embedding + generation + chat, streaming) | Done |
+| 2.4 | Anthropic provider (generation + chat, streaming) | Done |
+| 2.5 | Voyage provider (embedding) + Local provider (sentence-transformers) | Done |
+| 2.6 | Provider routing + TOML config + .env support + CLI (`yaaos-bus`) | Done |
+| 2.7 | Resource manager (VRAM/RAM monitoring, LRU eviction, idle timeout) | Done |
+| 2.8 | Python client SDK (sync + async) with timeout and error handling | Done |
+| 2.9 | SFS ModelBus integration provider (routes embeddings through daemon) | Done |
+| 2.10 | Hot-reload config, systemd service files, graceful shutdown | Done |
+
+**Success Criteria (all met):**
 - Any component can request `embed()` or `generate()` via socket
-- `yaaos config set default.generation openai` switches providers instantly
-- Model Bus prevents OOM by checking available resources
+- `yaaos-bus config set defaults.generation openai/gpt-4o` switches providers instantly
+- Model Bus prevents OOM by checking available VRAM/RAM before loading models
+- Streaming generation with back-pressure and broken pipe protection
+- 5 providers (Ollama, OpenAI, Anthropic, Voyage, local) — cloud + local
 
 **Dependencies:** Phase 1 (SFS is the first consumer)
 
 ---
 
-## Phase 3: SystemAgentd (Agent Orchestration)
+## Phase 3: SystemAgentd (Agent Orchestration) ← NEXT
 
 **Goal:** A supervisor daemon that manages AI agents as systemd services.
 

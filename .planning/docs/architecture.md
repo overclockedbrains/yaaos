@@ -18,7 +18,7 @@ YAAOS is structured as a layered system where AI agents are integrated at every 
 │               Agentic Shell (aish)                  │
 │        (Intent-driven, LLM-powered shell)           │
 ├─────────────────────────────────────────────────────┤
-│              SystemAgentd (Agent Bus)                │
+│              SystemAgentd (Agent Bus)               │
 │   ┌──────────┬──────────┬──────────┬──────────┐     │
 │   │Net-Agent │Crash-Agt │Res-Agent │Log-Agent │     │
 │   └──────────┴──────────┴──────────┴──────────┘     │
@@ -28,13 +28,13 @@ YAAOS is structured as a layered system where AI agents are integrated at every 
 │   │  FUSE Layer ←→ Embedding Engine ←→ VecDB │      │
 │   └──────────────────────────────────────────┘      │
 ├─────────────────────────────────────────────────────┤
-│            AI Runtime Layer (Model Bus)              │
+│            AI Runtime Layer (Model Bus)             │
 │   ┌──────────────────────────────────────────┐      │
 │   │  Ollama / llama.cpp  ←→  Model Registry  │      │
-│   │  (Local SLMs + Pluggable Cloud Providers) │      │
+│   │  (Local SLMs + Pluggable Cloud Providers)│      │
 │   └──────────────────────────────────────────┘      │
 ├─────────────────────────────────────────────────────┤
-│              Base OS (Arch Linux)                    │
+│              Base OS (Arch Linux)                   │
 │        systemd · pacman · Linux Kernel · GPU        │
 └─────────────────────────────────────────────────────┘
 ```
@@ -67,18 +67,24 @@ A unified interface for all AI inference in the system. Every component that nee
 │  endpoint   │     endpoint              │
 ├─────────────┴───────────────────────────┤
 │           Provider Router               │
-│  ┌─────────┐ ┌─────────┐ ┌───────────┐ │
-│  │ Ollama  │ │ OpenAI  │ │ Anthropic │ │
-│  │ (local) │ │ (cloud) │ │  (cloud)  │ │
-│  └─────────┘ └─────────┘ └───────────┘ │
+│  ┌─────────┐ ┌─────────┐ ┌───────────┐  │
+│  │ Ollama  │ │ OpenAI  │ │ Anthropic │  │
+│  │ (local) │ │ (cloud) │ │  (cloud)  │  │
+│  └─────────┘ └─────────┘ └───────────┘  │
 └─────────────────────────────────────────┘
 ```
 
+**Status:** Implemented (`yaaos-modelbus` v0.1.0, 173 tests)
+
 Key design decisions:
-- **Pluggable providers**: Local (Ollama/llama.cpp) is default. Cloud providers (OpenAI, Anthropic, etc.) are opt-in plugins configured via `~/.config/yaaos/providers.toml`.
-- **Swappable models**: Any component can request a specific capability (e.g., "embedding", "chat", "code") and the Model Bus routes to the configured provider.
-- **Single inference daemon**: Ollama runs as `ollama.service` under systemd. All components share this single instance to avoid loading duplicate models.
-- **Resource-aware**: The Model Bus knows available VRAM/RAM and refuses to load models that would cause OOM. Falls back gracefully.
+- **Transport**: asyncio Unix socket + NDJSON framing + JSON-RPC 2.0 protocol. Human-debuggable, no HTTP overhead.
+- **5 pluggable providers**: Ollama (local, default), OpenAI (cloud), Anthropic (cloud), Voyage (embeddings), local sentence-transformers. Configured via `~/.config/yaaos/modelbus.toml` + `.env` for API keys.
+- **Swappable models**: Components request by capability (embed/generate/chat). Model strings use `provider/model` convention (e.g., `ollama/nomic-embed-text`). The router resolves defaults.
+- **Resource-aware**: VRAM/RAM monitoring via pynvml + psutil. LRU eviction when capacity is low. Idle timeout unloads unused models. Capacity pre-checks before loading.
+- **Streaming**: First-class streaming generation with back-pressure. JSON-RPC notifications for chunks, final response with usage stats.
+- **Python SDK**: Sync + async client (`ModelBusClient`, `AsyncModelBusClient`) with timeouts and error handling.
+- **CLI**: `yaaos-bus` — health, models, embed, generate, config get/set.
+- **Hot-reload**: `config.reload` JSON-RPC method — atomic provider swap with zero downtime.
 
 ### Layer 2: Semantic File System (SFS)
 
@@ -88,22 +94,22 @@ The memory layer of YAAOS. SFS watches a directory, understands file *content* a
 Files created/modified in ~/semantic/
         │
         ▼
-┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
-│  File Watcher│────▶│ Processing      │────▶│  sqlite-vec  │
-│  (watchdog)  │     │ Pipeline        │     │  (vectors +  │
-│              │     │  1. Filter      │     │   FTS5 +     │
-│              │     │  2. Extract     │     │   metadata)  │
-│              │     │  3. Chunk       │     │              │
-│              │     │  4. Embed (GPU) │     │              │
-└──────────────┘     └─────────────────┘     └──────────────┘
-                                                    │
-┌──────────────┐     ┌─────────────────┐            │
-│   CLI Tool   │────▶│  Search Engine   │◀───────────┘
-│  `yaaos-find`│     │  3-signal RRF:   │
-│              │     │  vector+kw+path  │
-│  Daemon Query│────▶│  + recency boost │
-│  Server :9749│     │                  │
-└──────────────┘     └─────────────────┘
+┌──────────────┐      ┌─────────────────┐      ┌──────────────┐
+│  File Watcher│────> │ Processing      │────> │  sqlite-vec  │
+│  (watchdog)  │      │ Pipeline        │      │  (vectors +  │
+│              │      │  1. Filter      │      │   FTS5 +     │
+│              │      │  2. Extract     │      │   metadata)  │
+│              │      │  3. Chunk       │      │              │
+│              │      │  4. Embed (GPU) │      │              │
+└──────────────┘      └─────────────────┘      └──────────────┘
+                                                      │
+┌──────────────┐      ┌──────────────────┐            │
+│   CLI Tool   │────> │  Search Engine   │<───────────┘
+│  `yaaos-find`│      │  3-signal RRF:   │
+│              │      │  vector+kw+path  │
+│  Daemon Query│────> │  + recency boost │
+│  Server :9749│      │                  │
+└──────────────┘      └──────────────────┘
 ```
 
 Architecture (v2 — current):
