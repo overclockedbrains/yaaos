@@ -116,18 +116,20 @@ SFS is not just a search tool — it is the **semantic memory layer** that every
 |-----------|-------------|
 | 3.1 | SystemAgentd supervisor daemon |
 | 3.2 | Agent service template (`agent@.service`) |
-| 3.3 | Log-Agent (real-time journald analysis) |
-| 3.4 | Crash-Agent (core dump analysis, socket-activated) |
-| 3.5 | Resource-Agent (CPU/RAM prediction, cgroup tuning) |
-| 3.6 | Net-Agent (network anomaly detection) |
-| 3.7 | Agent Bus API (query status, start/stop agents) |
-| 3.8 | Migrate SFS daemon to run as a managed agent |
+| 3.3 | Tool Registry — pluggable CLI/process tool wrappers agents can invoke (adb, gradle, docker, git, pacman, systemctl, etc.) |
+| 3.4 | Log-Agent (real-time journald analysis) |
+| 3.5 | Crash-Agent (core dump analysis, socket-activated) |
+| 3.6 | Resource-Agent (CPU/RAM prediction, cgroup tuning) |
+| 3.7 | Net-Agent (network anomaly detection) |
+| 3.8 | Agent Bus API (query status, start/stop agents) |
+| 3.9 | Migrate SFS daemon to run as a managed agent |
 
 **Success Criteria:**
 - Agents run as systemd services with cgroup isolation
 - Crash-Agent analyzes a core dump and suggests a fix
 - Log-Agent surfaces anomalies from journalctl in real-time
 - `systemagentctl status` shows all running agents
+- Tool registry can discover and invoke CLI tools (adb, gradle, docker, etc.)
 
 **Dependencies:** Phase 2 (agents use Model Bus for inference)
 
@@ -146,6 +148,7 @@ SFS is not just a search tool — it is the **semantic memory layer** that every
 | 4.5 | Semantic pipes (`cat log | llm "find database errors"`) |
 | 4.6 | Integration with SFS (`yaaos-find` built into shell) |
 | 4.7 | Integration with SystemAgentd (agent status in shell) |
+| 4.8 | Multi-step task execution (plan → execute → verify → adapt on error) |
 
 **Success Criteria:**
 - `compress python files and send to staging` generates and executes correct commands
@@ -153,6 +156,31 @@ SFS is not just a search tool — it is the **semantic memory layer** that every
 - Standard shell commands still work normally (fallback to bash)
 
 **Dependencies:** Phase 2 (Model Bus), Phase 3 (agent integration)
+
+### Litmus Test: "Setup Android app and run it"
+
+The ultimate validation that YAAOS works end-to-end. A single natural language prompt should:
+
+```
+User: "Setup a basic Android app repo with latest tech stack, install whatever is needed,
+       build it, run it on an emulator, and verify it launches."
+```
+
+**What YAAOS does (no GUI needed):**
+1. Agentic Shell parses intent → generates a multi-step plan
+2. Tool Registry provides: `sdkmanager`, `avdmanager`, `gradle`, `adb`, `emulator`
+3. Agent installs Android SDK via `sdkmanager` (if missing)
+4. Agent scaffolds Kotlin/Compose project (template or LLM code-gen)
+5. Agent creates AVD via `avdmanager` + starts headless emulator (`emulator -no-window`)
+6. Agent builds with `./gradlew assembleDebug`
+7. Agent deploys with `adb install` + launches with `adb shell am start`
+8. Agent verifies launch via `adb shell dumpsys activity` (no vision needed)
+9. Agent reports success/failure with logs
+
+**Test pass criteria:**
+- [ ] Fresh system, single prompt, app running on emulator within 10 minutes
+- [ ] Agent recovers from at least one error (missing SDK component, build failure) without user intervention
+- [ ] `adb shell dumpsys activity | grep "mResumed=true"` confirms app is in foreground
 
 ---
 

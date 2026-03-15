@@ -20,6 +20,15 @@
 
 - [x] Phase 2 (Model Bus) — implemented, verified, manually tested end-to-end (2026-03-15)
 - [ ] Phase 3 (SystemAgentd) — next up
-- [ ] github ci needs upgrade
 
-- I want a reality check if yaaos will be able to execute these things or not "Setup a basic android app repo with latest tech stack and install any andoird studio things required and up it and run it on emulator and try accessing it and may be play around with the emulated app" - This is what I want finally a os which can do this.
+### 🎯 North-Star Test (Post Phase 4)
+
+> "Setup a basic Android app repo with latest tech stack, install whatever is needed, build it, run it on an emulator, and verify it launches."
+>
+> Single prompt. No GUI. Agent uses CLI tools (sdkmanager, gradle, adb, emulator -no-window).
+> Verifies launch via `adb shell dumpsys activity`. See [roadmap](/.planning/docs/roadmap.md) for full spec.
+
+### 📝 Personal TODOs
+
+- [ ] Github ci needs upgrade
+- [ ] Can YAAOS take current screen details and use it? (Answer: yes via D-Bus, /proc, headless browser CDP, adb uiautomator — no vision model needed for most cases)
