@@ -62,7 +62,7 @@ yaaos/
 │       └── tests/           # 173 tests
 ├── .planning/
 │   └── docs/                # Architecture, roadmap, tech stack, phase plans
-├── PROGRESS.md              # What's done, what's next
+├── todo.md                  # Vision checklist + north-star test
 └── README.md                # You are here
 ```
 
