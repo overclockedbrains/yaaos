@@ -131,6 +131,10 @@ class Config:
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "nomic-embed-text"
 
+    # Model Bus settings (optional)
+    modelbus_socket: str | None = None  # None = auto-discover
+    modelbus_model: str | None = None  # None = use Bus default
+
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
         config_path = path or DEFAULT_CONFIG_PATH
@@ -194,6 +198,12 @@ class Config:
                 config.ollama_base_url = ollama["base_url"]
             if "model" in ollama:
                 config.ollama_model = ollama["model"]
+
+            modelbus = data.get("providers", {}).get("modelbus", {})
+            if "socket" in modelbus:
+                config.modelbus_socket = modelbus["socket"]
+            if "model" in modelbus:
+                config.modelbus_model = modelbus["model"]
 
         # Ensure directories exist
         config.watch_dir.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,41 @@
+[Unit]
+Description=YAAOS Semantic File System — Index and Search by Meaning
+Documentation=https://github.com/Aman-Coding-Bamzii/yaaos
+After=network.target yaaos-modelbus.service
+Wants=yaaos-modelbus.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/yaaos-sfs
+RuntimeDirectory=yaaos
+RuntimeDirectoryMode=0755
+
+# Graceful shutdown
+KillMode=mixed
+TimeoutStopSec=15
+
+# Restart on failure with backoff
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=4096
+MemoryMax=4G
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/yaaos %h/.local/share/yaaos %h/.config/yaaos %h/semantic
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=yaaos-sfs
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -33,8 +33,11 @@ media = [
 code = [
     "tree-sitter-languages>=1.10",
 ]
+modelbus = [
+    "yaaos-modelbus",
+]
 all = [
-    "yaaos-sfs[docs,media,code]",
+    "yaaos-sfs[docs,media,code,modelbus]",
 ]
 dev = ["pytest>=8.0", "ruff>=0.8"]
 
@@ -44,6 +47,9 @@ yaaos-sfs = "yaaos_sfs.daemon:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.8"]
+
+[tool.uv.sources]
+yaaos-modelbus = { path = "../yaaos-modelbus", editable = true }
 
 [build-system]
 requires = ["hatchling"]

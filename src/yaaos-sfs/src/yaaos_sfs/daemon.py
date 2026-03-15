@@ -283,6 +283,15 @@ def _get_provider(config: Config) -> EmbeddingProvider:
 
         return OllamaEmbeddingProvider(config.ollama_model, config.ollama_base_url)
 
+    if provider == "modelbus":
+        from .providers.modelbus_provider import ModelBusEmbeddingProvider
+
+        return ModelBusEmbeddingProvider(
+            model=config.modelbus_model,
+            socket_path=config.modelbus_socket,
+            embedding_dims=config.embedding_dims if config.embedding_dims != 384 else None,
+        )
+
     # Default: local sentence-transformers (with GPU auto-detection)
     return LocalEmbeddingProvider(config.embedding_model, device=config.device)
 
