@@ -8,8 +8,11 @@ on:
 
 jobs:
   lint:
-    name: Lint
+    name: Lint (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [yaaos-sfs, yaaos-modelbus]
     steps:
       - uses: actions/checkout@v4
 
@@ -19,20 +22,23 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        working-directory: src/yaaos-sfs
+        working-directory: src/${{ matrix.project }}
         run: uv sync --dev
 
       - name: Ruff check
-        working-directory: src/yaaos-sfs
+        working-directory: src/${{ matrix.project }}
         run: uv run ruff check src/ tests/
 
       - name: Ruff format check
-        working-directory: src/yaaos-sfs
+        working-directory: src/${{ matrix.project }}
         run: uv run ruff format --check src/ tests/
 
   test:
-    name: Test
+    name: Test (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [yaaos-sfs, yaaos-modelbus]
     steps:
       - uses: actions/checkout@v4
 
@@ -42,11 +48,12 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        working-directory: src/yaaos-sfs
+        working-directory: src/${{ matrix.project }}
         run: uv sync --dev
 
       - name: Run fast tests (no model loading)
-        working-directory: src/yaaos-sfs
+        if: matrix.project == 'yaaos-sfs'
+        working-directory: src/${{ matrix.project }}
         run: >
           uv run pytest tests/ -v
           --ignore=tests/test_providers.py
@@ -54,5 +61,11 @@ jobs:
           -x
 
       - name: Run full tests (with embedding model)
-        working-directory: src/yaaos-sfs
+        if: matrix.project == 'yaaos-sfs'
+        working-directory: src/${{ matrix.project }}
+        run: uv run pytest tests/ -v
+
+      - name: Run tests
+        if: matrix.project == 'yaaos-modelbus'
+        working-directory: src/${{ matrix.project }}
         run: uv run pytest tests/ -v
