@@ -1,0 +1,26 @@
+[tool]
+name = "coredumpctl"
+description = "Core dump management and analysis"
+binary = "/usr/bin/coredumpctl"
+
+[tool.capabilities]
+actions = ["list", "info"]
+
+[tool.schema.list]
+description = "List available core dumps"
+args_template = "list --json=short --no-pager"
+output_format = "json"
+
+[tool.schema.info]
+description = "Show detailed info for a specific core dump"
+args_template = "info {{ pid }}"
+output_format = "text"
+
+[[tool.schema.info.parameters]]
+name = "pid"
+type = "string"
+required = true
+description = "PID of the crashed process"
+
+[tool.permissions]
+requires_root = false

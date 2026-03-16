@@ -1,0 +1,14 @@
+# NOTE: Socket activation is not yet wired in the crash-agent code path.
+# This unit is a placeholder for future systemd socket-activated on-demand
+# crash analysis. Currently crash-agent runs as a regular agent via the
+# supervisor or yaaos-agent CLI.
+
+[Unit]
+Description=YAAOS Crash-Agent Socket Activation
+
+[Socket]
+ListenStream=/run/yaaos/crash-agent.sock
+Accept=no
+
+[Install]
+WantedBy=sockets.target

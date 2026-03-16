@@ -1,0 +1,37 @@
+[tool]
+name = "git"
+description = "Distributed version control system"
+binary = "git"
+version_cmd = "git --version"
+
+[tool.capabilities]
+actions = ["status", "log", "diff", "branch"]
+
+[tool.schema.status]
+description = "Show the working tree status"
+args_template = "status --porcelain=v2"
+output_format = "text"
+
+[tool.schema.log]
+description = "Show recent commit log"
+args_template = "log --oneline -n {{ count | default(10) }}"
+output_format = "text"
+
+[tool.schema.log.parameters]
+type = "object"
+properties.count = { type = "integer", description = "Number of commits to show", default = 10 }
+
+[tool.schema.diff]
+description = "Show changes between commits or working tree"
+args_template = "diff {{ target | default('') }}"
+output_format = "text"
+
+[tool.schema.branch]
+description = "List branches"
+args_template = "branch --list"
+output_format = "text"
+
+[tool.permissions]
+requires_root = false
+network_access = false
+filesystem_write = false

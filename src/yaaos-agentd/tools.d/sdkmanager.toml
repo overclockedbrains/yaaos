@@ -1,0 +1,34 @@
+[tool]
+name = "sdkmanager"
+description = "Android SDK package manager"
+binary = "/usr/bin/sdkmanager"
+version_cmd = "sdkmanager --version"
+
+[tool.capabilities]
+actions = ["list", "install", "update"]
+
+[tool.schema.list]
+description = "List available and installed SDK packages"
+args_template = "--list"
+output_format = "text"
+
+[tool.schema.install]
+description = "Install an SDK package"
+args_template = "{{ package }}"
+output_format = "text"
+
+[[tool.schema.install.parameters]]
+name = "package"
+type = "string"
+required = true
+description = "SDK package to install (e.g. platforms;android-34)"
+
+[tool.schema.update]
+description = "Update all installed SDK packages"
+args_template = "--update"
+output_format = "text"
+
+[tool.permissions]
+requires_root = false
+network_access = true
+filesystem_write = true

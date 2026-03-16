@@ -1,0 +1,38 @@
+[tool]
+name = "journalctl"
+description = "Query systemd journal entries"
+binary = "/usr/bin/journalctl"
+version_cmd = "journalctl --version"
+
+[tool.capabilities]
+actions = ["query", "follow", "unit"]
+
+[tool.schema.query]
+description = "Query recent journal entries"
+args_template = "--no-pager --output=json -n {{ lines | default(50) }}"
+output_format = "json"
+
+[[tool.schema.query.parameters]]
+name = "lines"
+type = "integer"
+default = 50
+description = "Number of lines to return"
+
+[tool.schema.unit]
+description = "Query journal entries for a specific unit"
+args_template = "--no-pager --output=json -u {{ unit }} -n {{ lines | default(20) }}"
+output_format = "json"
+
+[[tool.schema.unit.parameters]]
+name = "unit"
+type = "string"
+required = true
+description = "systemd unit name"
+
+[[tool.schema.unit.parameters]]
+name = "lines"
+type = "integer"
+default = 20
+
+[tool.permissions]
+requires_root = false

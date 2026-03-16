@@ -1,0 +1,40 @@
+[tool]
+name = "gradle"
+description = "Build automation tool for JVM projects"
+binary = "/usr/bin/gradle"
+version_cmd = "gradle --version"
+
+[tool.capabilities]
+actions = ["build", "test", "tasks"]
+
+[tool.schema.build]
+description = "Run the project build"
+args_template = "build {{ '--no-daemon' if no_daemon | default(false) }}"
+output_format = "text"
+
+[[tool.schema.build.parameters]]
+name = "no_daemon"
+type = "boolean"
+required = false
+description = "Run without the Gradle daemon"
+
+[tool.schema.test]
+description = "Run the project tests"
+args_template = "test {{ '--tests ' ~ filter if filter }}"
+output_format = "text"
+
+[[tool.schema.test.parameters]]
+name = "filter"
+type = "string"
+required = false
+description = "Test filter pattern"
+
+[tool.schema.tasks]
+description = "List available Gradle tasks"
+args_template = "tasks --all"
+output_format = "text"
+
+[tool.permissions]
+requires_root = false
+network_access = true
+filesystem_write = true

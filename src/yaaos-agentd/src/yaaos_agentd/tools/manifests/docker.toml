@@ -1,0 +1,103 @@
+[tool]
+name = "docker"
+description = "Container runtime for building and running containers"
+binary = "/usr/bin/docker"
+version_cmd = "docker --version"
+
+[tool.capabilities]
+actions = ["ps", "run", "stop", "build", "logs", "inspect"]
+
+[tool.schema.ps]
+description = "List running containers"
+args_template = "ps --format json"
+output_format = "json"
+
+[tool.schema.run]
+description = "Run a container from an image"
+args_template = "run -d {{ '--name ' ~ name if name }}{% for p in ports | default([]) %} -p {{ p }}{% endfor %} {{ image }}"
+output_format = "text"
+
+[[tool.schema.run.parameters]]
+name = "image"
+type = "string"
+required = true
+description = "Container image to run"
+
+[[tool.schema.run.parameters]]
+name = "name"
+type = "string"
+required = false
+description = "Container name"
+
+[[tool.schema.run.parameters]]
+name = "ports"
+type = "array"
+required = false
+description = "Port mappings (e.g. 8080:80)"
+
+[tool.schema.stop]
+description = "Stop a running container"
+args_template = "stop {{ container_id }}"
+output_format = "exitcode"
+
+[[tool.schema.stop.parameters]]
+name = "container_id"
+type = "string"
+required = true
+description = "Container ID or name to stop"
+
+[tool.schema.build]
+description = "Build an image from a Dockerfile"
+args_template = "build {{ '-t ' ~ tag if tag }} {{ '-f ' ~ dockerfile if dockerfile }} {{ context | default('.') }}"
+output_format = "text"
+
+[[tool.schema.build.parameters]]
+name = "context"
+type = "string"
+required = false
+description = "Build context path"
+
+[[tool.schema.build.parameters]]
+name = "tag"
+type = "string"
+required = false
+description = "Image tag (e.g. myapp:latest)"
+
+[[tool.schema.build.parameters]]
+name = "dockerfile"
+type = "string"
+required = false
+description = "Path to Dockerfile"
+
+[tool.schema.logs]
+description = "Fetch logs from a container"
+args_template = "logs {{ '--tail ' ~ tail if tail }} {{ container_id }}"
+output_format = "text"
+
+[[tool.schema.logs.parameters]]
+name = "container_id"
+type = "string"
+required = true
+description = "Container ID or name"
+
+[[tool.schema.logs.parameters]]
+name = "tail"
+type = "integer"
+required = false
+description = "Number of lines to show from the end"
+
+[tool.schema.inspect]
+description = "Return low-level information on a container"
+args_template = "inspect {{ container_id }}"
+output_format = "json"
+
+[[tool.schema.inspect.parameters]]
+name = "container_id"
+type = "string"
+required = true
+description = "Container ID or name to inspect"
+
+[tool.permissions]
+requires_root = false
+network_access = true
+filesystem_write = true

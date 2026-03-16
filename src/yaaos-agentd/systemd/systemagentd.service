@@ -1,0 +1,39 @@
+[Unit]
+Description=YAAOS SystemAgentd — Agent Supervisor
+Documentation=https://github.com/Aman-Coding-Bamzii/yaaos
+After=yaaos-modelbus.service yaaos-sfs.service
+Wants=yaaos-modelbus.service yaaos-sfs.service
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/systemagentd
+ExecReload=/bin/kill -HUP $MAINPID
+DynamicUser=true
+RuntimeDirectory=yaaos
+RuntimeDirectoryMode=0750
+StateDirectory=yaaos
+
+KillMode=mixed
+TimeoutStopSec=30
+WatchdogSec=60
+NotifyAccess=all
+
+Restart=on-failure
+RestartSec=5
+
+MemoryMax=1G
+LimitNOFILE=4096
+
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/yaaos /var/lib/yaaos
+NoNewPrivileges=true
+PrivateTmp=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=systemagentd
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

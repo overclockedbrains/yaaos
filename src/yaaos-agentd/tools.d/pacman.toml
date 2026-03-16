@@ -1,0 +1,57 @@
+[tool]
+name = "pacman"
+description = "Arch Linux package manager"
+binary = "/usr/bin/pacman"
+version_cmd = "pacman --version"
+
+[tool.capabilities]
+actions = ["query", "search", "info", "sync"]
+
+[tool.schema.query]
+description = "List installed packages"
+args_template = "-Q {{ filter | default('') }}"
+output_format = "text"
+
+[[tool.schema.query.parameters]]
+name = "filter"
+type = "string"
+required = false
+description = "Optional package name filter"
+
+[tool.schema.search]
+description = "Search package repositories"
+args_template = "-Ss {{ term }}"
+output_format = "text"
+
+[[tool.schema.search.parameters]]
+name = "term"
+type = "string"
+required = true
+description = "Search term"
+
+[tool.schema.info]
+description = "Show package information"
+args_template = "-Si {{ package }}"
+output_format = "text"
+
+[[tool.schema.info.parameters]]
+name = "package"
+type = "string"
+required = true
+description = "Package name"
+
+[tool.schema.sync]
+description = "Install a package"
+args_template = "-S --noconfirm {{ package }}"
+output_format = "text"
+
+[[tool.schema.sync.parameters]]
+name = "package"
+type = "string"
+required = true
+description = "Package name to install"
+
+[tool.permissions]
+requires_root = true
+network_access = true
+filesystem_write = true

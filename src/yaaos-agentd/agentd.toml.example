@@ -1,0 +1,50 @@
+# YAAOS SystemAgentd Configuration
+# Copy to ~/.config/yaaos/agentd.toml and adjust as needed.
+#
+# Without this file, systemagentd starts with zero agents.
+# Each [agents.NAME] section declares an agent to supervise.
+
+[supervisor]
+log_level = "info"                # debug, info, warning, error
+reconcile_interval_sec = 10.0     # How often to check desired vs actual state
+max_restarts = 5                  # Max restarts per agent within window
+max_restart_window_sec = 60.0     # Restart intensity window
+# restart_strategy = "one_for_one"  # or "rest_for_one" (OTP-style)
+# allow_root_tools = false        # Set true to allow tools with requires_root
+
+# ── Agents ────────────────────────────────────────────────
+
+[agents.log]
+module = "yaaos_agentd.agents.log_agent"
+restart_policy = "permanent"      # always restart
+# [agents.log.config]
+# max_lines_per_cycle = 500
+# llm_enabled = false
+
+[agents.resource]
+module = "yaaos_agentd.agents.resource_agent"
+restart_policy = "permanent"
+# [agents.resource.config]
+# cpu_threshold = 90.0
+# memory_threshold = 85.0
+# llm_enabled = false
+
+[agents.net]
+module = "yaaos_agentd.agents.net_agent"
+restart_policy = "permanent"
+# [agents.net.config]
+# connection_spike_threshold = 50
+# llm_enabled = false
+
+[agents.crash]
+module = "yaaos_agentd.agents.crash_agent"
+restart_policy = "transient"      # restart only on failure, not clean exit
+# [agents.crash.config]
+# llm_enabled = false
+# max_dumps_per_cycle = 5
+
+[agents.fs]
+module = "yaaos_agentd.agents.fs_agent"
+restart_policy = "permanent"
+# [agents.fs.config]
+# delegate_to = "yaaos-sfs.service"

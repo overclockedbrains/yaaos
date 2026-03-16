@@ -1,0 +1,54 @@
+[tool]
+name = "systemctl"
+description = "systemd service management"
+binary = "systemctl"
+version_cmd = "systemctl --version"
+
+[tool.capabilities]
+actions = ["status", "start", "stop", "restart", "list-units"]
+
+[tool.schema.status]
+description = "Show unit status"
+args_template = "status {{ unit }}"
+output_format = "text"
+[tool.schema.status.parameters]
+type = "object"
+properties.unit = { type = "string", description = "Unit name" }
+required = ["unit"]
+
+[tool.schema.list-units]
+description = "List active units"
+args_template = "list-units --type=service --state=running --no-pager"
+output_format = "text"
+
+[tool.schema.start]
+description = "Start a unit"
+args_template = "start {{ unit }}"
+output_format = "exitcode"
+[tool.schema.start.parameters]
+type = "object"
+properties.unit = { type = "string", description = "Unit name" }
+required = ["unit"]
+
+[tool.schema.stop]
+description = "Stop a unit"
+args_template = "stop {{ unit }}"
+output_format = "exitcode"
+[tool.schema.stop.parameters]
+type = "object"
+properties.unit = { type = "string", description = "Unit name" }
+required = ["unit"]
+
+[tool.schema.restart]
+description = "Restart a unit"
+args_template = "restart {{ unit }}"
+output_format = "exitcode"
+[tool.schema.restart.parameters]
+type = "object"
+properties.unit = { type = "string", description = "Unit name" }
+required = ["unit"]
+
+[tool.permissions]
+requires_root = true
+network_access = false
+filesystem_write = false

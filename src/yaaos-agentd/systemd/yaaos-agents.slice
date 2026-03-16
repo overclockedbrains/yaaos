@@ -1,0 +1,8 @@
+[Unit]
+Description=YAAOS Agent Resource Slice
+
+[Slice]
+# All agents combined get max 30% CPU and 2GB RAM
+CPUQuota=30%
+MemoryMax=2G
+IOWeight=50

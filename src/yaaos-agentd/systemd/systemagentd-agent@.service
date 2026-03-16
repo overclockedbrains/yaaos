@@ -1,0 +1,41 @@
+[Unit]
+Description=YAAOS Agent: %i
+After=systemagentd.service
+BindsTo=systemagentd.service
+Documentation=https://github.com/Aman-Coding-Bamzii/yaaos
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/yaaos-agent %i
+WatchdogSec=60
+
+# Resource isolation via cgroups v2
+Slice=yaaos-agents.slice
+CPUQuota=10%%
+MemoryMax=512M
+IOWeight=50
+TasksMax=64
+
+# Security hardening
+DynamicUser=true
+StateDirectory=yaaos/agents/%i
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/run/yaaos /var/lib/yaaos/agents/%i
+PrivateTmp=true
+
+# Restart policy (overridden per-agent via drop-ins)
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Structured logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=yaaos-agent-%i
+Environment=AGENT_NAME=%i PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=systemagentd.service

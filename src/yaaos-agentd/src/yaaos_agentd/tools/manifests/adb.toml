@@ -1,0 +1,131 @@
+[tool]
+name = "adb"
+description = "Android Debug Bridge for communicating with Android devices"
+binary = "/usr/bin/adb"
+version_cmd = "adb version"
+
+[tool.capabilities]
+actions = ["devices", "shell", "install", "logcat", "push", "pull", "forward", "screenrecord"]
+
+[tool.schema.devices]
+description = "List connected Android devices"
+args_template = "devices -l"
+output_format = "text"
+
+[tool.schema.shell]
+description = "Run a shell command on the connected device"
+args_template = "shell {{ command }}"
+output_format = "text"
+
+[[tool.schema.shell.parameters]]
+name = "command"
+type = "string"
+required = true
+description = "Shell command to execute on device"
+
+[tool.schema.install]
+description = "Install an APK on the connected device"
+args_template = "install {{ '-r' if reinstall | default(false) }} {{ apk_path }}"
+output_format = "text"
+
+[[tool.schema.install.parameters]]
+name = "apk_path"
+type = "string"
+required = true
+description = "Path to the APK file"
+
+[[tool.schema.install.parameters]]
+name = "reinstall"
+type = "boolean"
+required = false
+description = "Reinstall the app keeping its data"
+
+[tool.schema.logcat]
+description = "View device log output"
+args_template = "logcat {{ '-d' if dump | default(false) }} {{ '-s ' ~ tag if tag }}"
+output_format = "text"
+
+[[tool.schema.logcat.parameters]]
+name = "dump"
+type = "boolean"
+required = false
+description = "Dump the log and exit"
+
+[[tool.schema.logcat.parameters]]
+name = "tag"
+type = "string"
+required = false
+description = "Filter by log tag"
+
+[tool.schema.push]
+description = "Push a file to the device"
+args_template = "push {{ local }} {{ remote }}"
+output_format = "text"
+
+[[tool.schema.push.parameters]]
+name = "local"
+type = "string"
+required = true
+description = "Local file path"
+
+[[tool.schema.push.parameters]]
+name = "remote"
+type = "string"
+required = true
+description = "Remote path on device"
+
+[tool.schema.pull]
+description = "Pull a file from the device"
+args_template = "pull {{ remote }} {{ local }}"
+output_format = "text"
+
+[[tool.schema.pull.parameters]]
+name = "remote"
+type = "string"
+required = true
+description = "Remote path on device"
+
+[[tool.schema.pull.parameters]]
+name = "local"
+type = "string"
+required = true
+description = "Local destination path"
+
+[tool.schema.forward]
+description = "Set up port forwarding from host to device"
+args_template = "forward tcp:{{ host_port }} tcp:{{ device_port }}"
+output_format = "text"
+
+[[tool.schema.forward.parameters]]
+name = "host_port"
+type = "integer"
+required = true
+description = "Host port number"
+
+[[tool.schema.forward.parameters]]
+name = "device_port"
+type = "integer"
+required = true
+description = "Device port number"
+
+[tool.schema.screenrecord]
+description = "Record the device screen"
+args_template = "shell screenrecord {{ '--time-limit ' ~ time_limit if time_limit }} {{ output_path | default('/sdcard/recording.mp4') }}"
+output_format = "text"
+
+[[tool.schema.screenrecord.parameters]]
+name = "output_path"
+type = "string"
+required = false
+description = "Output file path on device"
+
+[[tool.schema.screenrecord.parameters]]
+name = "time_limit"
+type = "integer"
+required = false
+description = "Maximum recording time in seconds"
+
+[tool.permissions]
+requires_root = false
+network_access = true
+filesystem_write = true
