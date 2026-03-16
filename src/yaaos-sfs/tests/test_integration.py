@@ -20,6 +20,7 @@ _load_err = None
 _provider = None
 try:
     from yaaos_sfs.providers.local import LocalEmbeddingProvider
+
     _provider = LocalEmbeddingProvider("all-MiniLM-L6-v2")
 except Exception as exc:
     _load_err = exc
