@@ -13,7 +13,7 @@ from .config import Config
 console = Console()
 
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, context_settings={"allow_interspersed_args": True})
 @click.argument("query", required=False)
 @click.option("--top", "-n", default=10, help="Number of results to show")
 @click.option(
