@@ -7,8 +7,9 @@ Wants=ollama.service
 [Service]
 Type=notify
 ExecStart=/usr/bin/yaaos-modelbusd
+DynamicUser=true
 RuntimeDirectory=yaaos
-RuntimeDirectoryMode=0755
+RuntimeDirectoryMode=0750
 
 # Graceful shutdown: send SIGTERM, wait 30s for drain, then SIGKILL
 KillMode=mixed
