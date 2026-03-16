@@ -657,6 +657,14 @@ systemd = [
     { name = "sdnotify" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0" },
@@ -679,6 +687,14 @@ requires-dist = [
     { name = "yaaos-modelbus", editable = "../yaaos-modelbus" },
 ]
 provides-extras = ["nvidia", "systemd", "all", "dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pytest-timeout", specifier = ">=2.0" },
+    { name = "ruff", specifier = ">=0.5" },
+]
 
 [[package]]
 name = "yaaos-modelbus"

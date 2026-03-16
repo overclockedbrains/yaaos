@@ -43,6 +43,9 @@ resource = "yaaos_agentd.agents.resource_agent:ResourceAgent"
 net = "yaaos_agentd.agents.net_agent:NetAgent"
 fs = "yaaos_agentd.agents.fs_agent:FsAgent"
 
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.5", "pytest-timeout>=2.0"]
+
 [tool.uv.sources]
 yaaos-modelbus = { path = "../yaaos-modelbus", editable = true }
 
