@@ -13,7 +13,7 @@
 Phase 1 ──▶ Phase 1.5 ──▶ Phase 2 ──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 ──▶ Phase 6
   SFS         SFS v2       Model       System      Agentic      Desktop     Arch
  (MVP)      (Production)    Bus        Agentd       Shell         DE        ISO
-  ✓            ✓            ✓
+  ✓            ✓            ✓           ✓
 ```
 
 ---
@@ -108,34 +108,37 @@ SFS is not just a search tool — it is the **semantic memory layer** that every
 
 ---
 
-## Phase 3: SystemAgentd (Agent Orchestration) ← NEXT
+## Phase 3: SystemAgentd (Agent Orchestration) — DONE
 
 **Goal:** A supervisor daemon that manages AI agents as systemd services.
 
-| Milestone | Deliverable |
-|-----------|-------------|
-| 3.1 | SystemAgentd supervisor daemon |
-| 3.2 | Agent service template (`agent@.service`) |
-| 3.3 | Tool Registry — pluggable CLI/process tool wrappers agents can invoke (adb, gradle, docker, git, pacman, systemctl, etc.) |
-| 3.4 | Log-Agent (real-time journald analysis) |
-| 3.5 | Crash-Agent (core dump analysis, socket-activated) |
-| 3.6 | Resource-Agent (CPU/RAM prediction, cgroup tuning) |
-| 3.7 | Net-Agent (network anomaly detection) |
-| 3.8 | Agent Bus API (query status, start/stop agents) |
-| 3.9 | Migrate SFS daemon to run as a managed agent |
+**Completed:** 2026-03-16 | **Version:** 0.1.0 | **Tests:** passing
 
-**Success Criteria:**
-- Agents run as systemd services with cgroup isolation
-- Crash-Agent analyzes a core dump and suggests a fix
+| Milestone | Deliverable | Status |
+|-----------|-------------|--------|
+| 3.1 | SystemAgentd supervisor daemon (OTP-style supervision, reconciliation loop) | Done |
+| 3.2 | Agent service template (`agent@.service`) + crash socket + agents slice | Done |
+| 3.3 | Tool Registry — TOML manifests, JSON Schema validation, Jinja2 templates, bubblewrap sandbox (9 tools: docker, git, adb, gradle, sdkmanager, journalctl, systemctl, coredumpctl, pacman) | Done |
+| 3.4 | Log-Agent (real-time journald analysis with anomaly detection) | Done |
+| 3.5 | Crash-Agent (core dump analysis via coredumpctl, socket-activated) | Done |
+| 3.6 | Resource-Agent (CPU/RAM/GPU monitoring with predictive alerts) | Done |
+| 3.7 | Net-Agent (network anomaly detection via conntrack/ss) | Done |
+| 3.8 | Agent Bus API (JSON-RPC 2.0 Unix socket + `systemagentctl` CLI) | Done |
+| 3.9 | FS-Agent: SFS daemon wrapper managed via D-Bus/systemd | Done |
+
+**Success Criteria (all met):**
+- Agents run as systemd services with cgroup isolation (`yaaos-agents.slice`: 30% CPU, 2GB RAM)
+- Crash-Agent analyzes core dumps and suggests fixes
 - Log-Agent surfaces anomalies from journalctl in real-time
 - `systemagentctl status` shows all running agents
-- Tool registry can discover and invoke CLI tools (adb, gradle, docker, etc.)
+- Tool registry discovers and invokes CLI tools (docker, git, adb, etc.)
+- SFS runs as FS-Agent under supervisor management
 
 **Dependencies:** Phase 2 (agents use Model Bus for inference)
 
 ---
 
-## Phase 4: Agentic Shell (aish)
+## Phase 4: Agentic Shell (aish) ← NEXT
 
 **Goal:** An intent-driven shell that understands natural language commands.
 

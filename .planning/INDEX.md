@@ -10,6 +10,8 @@ Finalized documents driving development.
 - [roadmap.md](docs/roadmap.md) — Full 6-phase roadmap with milestones and dependencies
 - [sfs_v2_plan.md](docs/sfs_v2_plan.md) — SFS v2 plan: production-ready with filtering, multi-format, smart chunking, scale
 - [phase2_model_bus_plan.md](docs/phase2_model_bus_plan.md) — Phase 2: Model Bus — unified AI runtime, pluggable providers, resource management, streaming
+- [phase3_systemagentd_plan.md](docs/phase3_systemagentd_plan.md) — Phase 3: SystemAgentd — agent orchestration, OTP supervision, Tool Registry
+- [dev_commands.md](docs/dev_commands.md) — Dev commands reference for all YAAOS components
 
 ## Drafts (Brainstorming)
 
@@ -20,10 +22,12 @@ Early brainstorming documents. Kept for historical context.
 
 ## Project Status
 
-**Current Phase:** Phase 2 — Model Bus (planned, ready for implementation)
-**Phase 1 (MVP):** Complete
+**Current Phase:** Phase 4 — Agentic Shell (next)
+**Phase 1 (SFS MVP):** Complete
 **Phase 1.5 (SFS v2):** Complete (2026-03-15) — v0.2.0, 136 tests passing
-**Code Location:** `src/yaaos-sfs/`
+**Phase 2 (Model Bus):** Complete (2026-03-15) — v0.1.0, 173 tests passing
+**Phase 3 (SystemAgentd):** Complete (2026-03-16) — v0.1.0
+**Code Locations:** `src/yaaos-sfs/`, `src/yaaos-modelbus/`, `src/yaaos-agentd/`
 
 ### Quick Reference
 
@@ -36,7 +40,11 @@ Early brainstorming documents. Kept for historical context.
 │   ├── mvp_scope.md      ← Phase 1 MVP scope
 │   ├── roadmap.md        ← the full 6-phase plan
 │   ├── sfs_v2_plan.md    ← SFS v2 production plan
-│   └── phase2_model_bus_plan.md ← Phase 2 Model Bus plan
+│   ├── phase2_model_bus_plan.md ← Phase 2 Model Bus plan
+│   ├── phase3_systemagentd_plan.md ← Phase 3 SystemAgentd plan
+│   └── dev_commands.md   ← dev commands reference
+├── phases/
+│   └── 03-systemagentd/  ← Phase 3 research docs
 └── drafts/
     ├── 01_*.md           ← original brainstorm
     └── 02_*.md           ← audiences & use cases
