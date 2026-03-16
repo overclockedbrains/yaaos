@@ -28,6 +28,7 @@ SystemAgentd is the daemon that turns YAAOS from "a Linux distro with AI tools" 
 - **User-facing natural language interface** — Agents are system services, not chatbots. NL interaction comes via `aish` in Phase 4.
 - **GUI dashboard** — Phase 5 (Desktop Environment).
 - **Rust rewrite** — Python MVP first, Rust when battle-tested.
+- **Daemon-mode dependency injection** — `Supervisor.__init__` accepts `model_bus_client`, `tool_registry`, `sfs_client` kwargs (used by tests and `agent_runner.py`), but `run_daemon()` calls `Supervisor(config)` without injecting live clients. Agents currently degrade gracefully when clients are `None`. Full daemon-level client injection (supervisor-owned Model Bus connection, health probing) is deferred to Phase 4.
 - **eBPF-based monitoring** — Net-Agent and Resource-Agent use userspace tools (psutil, /proc, conntrack) in Phase 3. eBPF is a future optimization.
 - **Remote/distributed agents** — All agents run on the local machine.
 - **Agent marketplace / third-party agents** — First-party agents only in Phase 3.

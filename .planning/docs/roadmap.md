@@ -139,6 +139,9 @@ SFS is not just a search tool — it is the **semantic memory layer** that every
 
 **Goal:** An intent-driven shell that understands natural language commands.
 
+**Deferred from Phase 3:**
+- **Daemon-mode DI wiring** — `run_daemon()` should inject a supervisor-owned `AsyncModelBusClient` (and optionally `ToolRegistry`, `SfsClient`) into `Supervisor()`, enabling supervisor-level health probing of Model Bus. Infra is in place (`Supervisor.__init__` accepts the kwargs, `_start_agent` passes them through); only the daemon call site needs wiring.
+
 | Milestone | Deliverable |
 |-----------|-------------|
 | 4.1 | Shell prototype (bash/nushell wrapper + LLM intent layer) |
