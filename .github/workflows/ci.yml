@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [yaaos-sfs, yaaos-modelbus]
+        project: [yaaos-sfs, yaaos-modelbus, yaaos-agentd]
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        project: [yaaos-sfs, yaaos-modelbus]
+        project: [yaaos-sfs, yaaos-modelbus, yaaos-agentd]
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +66,6 @@ jobs:
         run: uv run pytest tests/ -v
 
       - name: Run tests
-        if: matrix.project == 'yaaos-modelbus'
+        if: matrix.project != 'yaaos-sfs'
         working-directory: src/${{ matrix.project }}
         run: uv run pytest tests/ -v
