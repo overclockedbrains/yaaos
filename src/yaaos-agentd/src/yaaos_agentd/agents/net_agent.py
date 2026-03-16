@@ -129,12 +129,14 @@ class NetAgent(BaseAgent):
         new_ports = current_ports - self._known_listeners - self._expected_ports
         if new_ports and not self._first_cycle:
             for port in new_ports:
-                actions.append(Action(
-                    tool="alert",
-                    action="new_listener",
-                    params={"port": port},
-                    description=f"New listening port detected: {port}",
-                ))
+                actions.append(
+                    Action(
+                        tool="alert",
+                        action="new_listener",
+                        params={"port": port},
+                        description=f"New listening port detected: {port}",
+                    )
+                )
 
         # Update known listeners
         self._known_listeners = current_ports.copy()
@@ -144,16 +146,18 @@ class NetAgent(BaseAgent):
         established = observation.get("established", 0)
         if self._baseline_rate > 0:
             if established > self._baseline_rate * self._rate_threshold:
-                actions.append(Action(
-                    tool="alert",
-                    action="connection_spike",
-                    params={
-                        "current": established,
-                        "baseline": round(self._baseline_rate, 1),
-                        "multiplier": round(established / self._baseline_rate, 1),
-                    },
-                    description=f"Connection spike: {established} (baseline {self._baseline_rate:.0f})",
-                ))
+                actions.append(
+                    Action(
+                        tool="alert",
+                        action="connection_spike",
+                        params={
+                            "current": established,
+                            "baseline": round(self._baseline_rate, 1),
+                            "multiplier": round(established / self._baseline_rate, 1),
+                        },
+                        description=f"Connection spike: {established} (baseline {self._baseline_rate:.0f})",
+                    )
+                )
 
         # Update baseline (EWMA)
         alpha = 0.1
@@ -166,16 +170,18 @@ class NetAgent(BaseAgent):
 
         if self._llm_enabled and self.model_bus and actions:
             anomaly_details = [a.description for a in actions]
-            actions.append(Action(
-                tool="model_bus",
-                action="analyze_network",
-                params={
-                    "anomalies": anomaly_details,
-                    "established": established,
-                    "listening_ports": observation.get("listening_ports", []),
-                },
-                description="LLM network anomaly analysis",
-            ))
+            actions.append(
+                Action(
+                    tool="model_bus",
+                    action="analyze_network",
+                    params={
+                        "anomalies": anomaly_details,
+                        "established": established,
+                        "listening_ports": observation.get("listening_ports", []),
+                    },
+                    description="LLM network anomaly analysis",
+                )
+            )
 
         self._first_cycle = False
         return actions
@@ -192,12 +198,14 @@ class NetAgent(BaseAgent):
                     f"net_agent.{action.action}",
                     **{k: v for k, v in action.params.items() if isinstance(v, (int, float, str))},
                 )
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output=action.description,
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=True,
+                        output=action.description,
+                        duration_ms=(time.monotonic() - start) * 1000,
+                    )
+                )
 
             elif action.tool == "model_bus" and self.model_bus:
                 try:
@@ -218,25 +226,31 @@ class NetAgent(BaseAgent):
                         if "token" in chunk:
                             text_parts.append(chunk["token"])
                     analysis = "".join(text_parts)
-                    results.append(ActionResult(
+                    results.append(
+                        ActionResult(
+                            action=action,
+                            success=True,
+                            output=analysis[:1000],
+                            duration_ms=(time.monotonic() - start) * 1000,
+                        )
+                    )
+                except Exception as e:
+                    results.append(
+                        ActionResult(
+                            action=action,
+                            success=False,
+                            error=str(e),
+                            duration_ms=(time.monotonic() - start) * 1000,
+                        )
+                    )
+            else:
+                results.append(
+                    ActionResult(
                         action=action,
                         success=True,
-                        output=analysis[:1000],
+                        output="No handler",
                         duration_ms=(time.monotonic() - start) * 1000,
-                    ))
-                except Exception as e:
-                    results.append(ActionResult(
-                        action=action,
-                        success=False,
-                        error=str(e),
-                        duration_ms=(time.monotonic() - start) * 1000,
-                    ))
-            else:
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output="No handler",
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                    )
+                )
 
         return results

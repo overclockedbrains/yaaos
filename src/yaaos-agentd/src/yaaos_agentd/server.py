@@ -133,11 +133,13 @@ class AgentBusServer:
         name = params.get("name")
         if not name:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameter: name")
 
         status = self._supervisor.get_agent_status(name)
         if status is None:
             from yaaos_agentd.errors import AgentNotFoundError
+
             raise AgentNotFoundError(name)
 
         return status.to_dict()
@@ -146,6 +148,7 @@ class AgentBusServer:
         name = params.get("name")
         if not name:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameter: name")
 
         await self._supervisor.start_agent(name)
@@ -155,6 +158,7 @@ class AgentBusServer:
         name = params.get("name")
         if not name:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameter: name")
 
         await self._supervisor.stop_agent(name)
@@ -164,6 +168,7 @@ class AgentBusServer:
         name = params.get("name")
         if not name:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameter: name")
 
         await self._supervisor.restart_agent(name)
@@ -174,11 +179,13 @@ class AgentBusServer:
         name = params.get("name")
         if not name:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameter: name")
 
         status = self._supervisor.get_agent_status(name)
         if status is None:
             from yaaos_agentd.errors import AgentNotFoundError
+
             raise AgentNotFoundError(name)
 
         lines = params.get("lines", 50)
@@ -186,7 +193,14 @@ class AgentBusServer:
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                "journalctl", "-u", unit, "-n", str(lines), "--no-pager", "-o", "short-iso",
+                "journalctl",
+                "-u",
+                unit,
+                "-n",
+                str(lines),
+                "--no-pager",
+                "-o",
+                "short-iso",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -207,11 +221,13 @@ class AgentBusServer:
     async def _handle_tools_schema(self, params: dict) -> dict:
         if self._registry is None:
             from yaaos_agentd.errors import ToolNotFoundError
+
             raise ToolNotFoundError(params.get("tool", "unknown"))
 
         tool_name = params.get("tool")
         if not tool_name:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameter: tool")
 
         tool = self._registry.get_tool(tool_name)
@@ -226,6 +242,7 @@ class AgentBusServer:
     async def _handle_tools_invoke(self, params: dict) -> dict:
         if self._registry is None:
             from yaaos_agentd.errors import ToolNotFoundError
+
             raise ToolNotFoundError(params.get("tool", "unknown"))
 
         tool_name = params.get("tool")
@@ -235,6 +252,7 @@ class AgentBusServer:
 
         if not tool_name or not action:
             from yaaos_agentd.errors import InvalidParamsError
+
             raise InvalidParamsError("Missing required parameters: tool, action")
 
         # Clamp timeout to [1, 120] to prevent resource exhaustion
@@ -249,18 +267,18 @@ class AgentBusServer:
             allow_root = self._supervisor.config.supervisor.allow_root_tools
             if not allow_root:
                 from yaaos_agentd.errors import InvalidParamsError
+
                 raise InvalidParamsError(
                     f"Tool '{tool_name}' requires root privileges and is blocked by policy. "
                     f"Set [supervisor] allow_root_tools = true in config to enable."
                 )
 
-        result = await self._registry.invoke(
-            tool_name, action, tool_params, timeout=timeout
-        )
+        result = await self._registry.invoke(tool_name, action, tool_params, timeout=timeout)
         return result.to_dict()
 
     async def _handle_config_reload(self, params: dict) -> dict:
         from yaaos_agentd.config import Config
+
         new_config = Config.load(self._config_path)
         self._supervisor.config = new_config
         await self._supervisor.reconcile()
@@ -372,15 +390,11 @@ class AgentBusServer:
         params = msg.get("params", {})
 
         if not method or not isinstance(method, str):
-            await self._send_error(
-                writer, request_id, InvalidRequestError("Missing method")
-            )
+            await self._send_error(writer, request_id, InvalidRequestError("Missing method"))
             return
 
         if self._shutting_down:
-            await self._send_error(
-                writer, request_id, InternalError("Server is shutting down")
-            )
+            await self._send_error(writer, request_id, InternalError("Server is shutting down"))
             return
 
         self._request_count += 1

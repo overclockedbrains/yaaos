@@ -84,9 +84,7 @@ class AsyncAgentBusClient:
 
                 if "error" in response:
                     err = response["error"]
-                    exc = AgentdError(
-                        err.get("message", "Unknown error"), err.get("data")
-                    )
+                    exc = AgentdError(err.get("message", "Unknown error"), err.get("data"))
                     exc.code = err.get("code", exc.code)
                     raise exc
 
@@ -185,6 +183,7 @@ class AgentBusClient:
 
         if loop and loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 return pool.submit(asyncio.run, coro).result()
         else:

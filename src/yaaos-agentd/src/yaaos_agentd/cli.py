@@ -50,12 +50,14 @@ def main(ctx: click.Context, socket_path: str | None):
     """YAAOS SystemAgentd CLI — manage agents and tools."""
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass
 
     if socket_path is None:
         import os
+
         socket_path = os.environ.get("YAAOS_AGENTBUS_SOCKET")
 
     ctx.ensure_object(CliContext)
@@ -331,6 +333,7 @@ def tools_schema(ctx: CliContext, tool_name: str):
         sys.exit(1)
 
     import json
+
     console.print(f"[bold]Tool:[/bold] {result.get('tool', tool_name)}")
     for name, schema in result.get("schemas", {}).items():
         console.print(f"\n[cyan]{name}[/cyan]: {schema.get('description', '')}")
@@ -345,7 +348,9 @@ def tools_schema(ctx: CliContext, tool_name: str):
 @click.option("--param", "-p", multiple=True, help="Parameters as key=value")
 @click.option("--timeout", "-t", default=30.0, help="Timeout in seconds")
 @pass_ctx
-def tools_invoke(ctx: CliContext, tool_name: str, action: str, extra_args: tuple, param: tuple, timeout: float):
+def tools_invoke(
+    ctx: CliContext, tool_name: str, action: str, extra_args: tuple, param: tuple, timeout: float
+):
     """Invoke a tool action manually.
 
     Pass parameters as key=value after the action, or use -p key=value.

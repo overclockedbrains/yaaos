@@ -39,6 +39,7 @@ class _ProcessMetrics:
             return self._available
         try:
             import psutil
+
             self._process = psutil.Process(os.getpid())
             # Prime cpu_percent — first call always returns 0.0
             self._process.cpu_percent()

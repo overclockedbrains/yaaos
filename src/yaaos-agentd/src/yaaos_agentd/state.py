@@ -56,9 +56,7 @@ class AgentStateDB:
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a value by key, deserializing from JSON."""
-        row = self._conn.execute(
-            "SELECT value FROM state WHERE key = ?", (key,)
-        ).fetchone()
+        row = self._conn.execute("SELECT value FROM state WHERE key = ?", (key,)).fetchone()
         if row is None:
             return default
         return orjson.loads(row[0])
@@ -112,6 +110,7 @@ def _resolve_state_dir() -> Path:
 def _can_create(path: Path) -> bool:
     """Check if we can create a directory at this path."""
     import os
+
     parent = path.parent
     try:
         return parent.exists() and os.access(parent, os.W_OK)

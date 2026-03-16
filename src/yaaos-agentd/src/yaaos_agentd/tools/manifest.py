@@ -23,8 +23,8 @@ class ToolSchema:
     name: str
     description: str = ""
     parameters: dict[str, Any] = field(default_factory=dict)  # JSON Schema object
-    args_template: str = ""                                     # Jinja2 template → CLI args
-    output_format: str = "text"                                 # json | text | exitcode
+    args_template: str = ""  # Jinja2 template → CLI args
+    output_format: str = "text"  # json | text | exitcode
 
     def to_dict(self) -> dict:
         return {

@@ -106,10 +106,7 @@ class ToolRegistry:
             results = [t for t in results if name in t.name]
 
         if capability is not None:
-            results = [
-                t for t in results
-                if capability in t.capabilities
-            ]
+            results = [t for t in results if capability in t.capabilities]
 
         return results
 
@@ -176,7 +173,9 @@ class ToolRegistry:
 
         # Execute
         log = self._log.bind(tool=tool_name, action=action)
-        log.debug("tool_registry.invoking", cmd=cmd, sandboxed=bool(sandbox and tool.sandbox_config))
+        log.debug(
+            "tool_registry.invoking", cmd=cmd, sandboxed=bool(sandbox and tool.sandbox_config)
+        )
 
         start = time.monotonic()
         try:

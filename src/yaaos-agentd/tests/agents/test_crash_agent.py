@@ -45,9 +45,7 @@ class TestCrashAgentObserve:
 
         mock_proc = AsyncMock()
         mock_proc.returncode = 0
-        mock_proc.communicate = AsyncMock(
-            return_value=(json.dumps(dumps).encode(), b"")
-        )
+        mock_proc.communicate = AsyncMock(return_value=(json.dumps(dumps).encode(), b""))
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             obs = await agent.observe()
@@ -67,9 +65,7 @@ class TestCrashAgentObserve:
 
         mock_proc = AsyncMock()
         mock_proc.returncode = 0
-        mock_proc.communicate = AsyncMock(
-            return_value=(json.dumps(dumps).encode(), b"")
-        )
+        mock_proc.communicate = AsyncMock(return_value=(json.dumps(dumps).encode(), b""))
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             obs = await agent.observe()
@@ -106,6 +102,7 @@ class TestCrashAgentAct:
         agent = CrashAgent(_crash_spec())
 
         from yaaos_agentd.types import Action
+
         action = Action(
             tool="coredumpctl",
             action="backtrace",
@@ -116,7 +113,10 @@ class TestCrashAgentAct:
         # Mock backtrace extraction
         mock_proc = AsyncMock()
         mock_proc.communicate = AsyncMock(
-            return_value=(b"#0  0x0000 in main () at main.c:42\n#1  0x1234 in __libc_start_main", b"")
+            return_value=(
+                b"#0  0x0000 in main () at main.c:42\n#1  0x1234 in __libc_start_main",
+                b"",
+            )
         )
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
@@ -130,6 +130,7 @@ class TestCrashAgentAct:
         agent = CrashAgent(_crash_spec())
 
         from yaaos_agentd.types import Action
+
         action = Action(
             tool="coredumpctl",
             action="backtrace",
@@ -148,6 +149,7 @@ class TestCrashAgentAct:
         agent = CrashAgent(_crash_spec())
 
         from yaaos_agentd.types import Action
+
         action = Action(
             tool="coredumpctl",
             action="backtrace",

@@ -52,25 +52,27 @@ def _full_config(tmp_path: Path, **agent_overrides) -> Config:
 
 def _full_registry() -> ToolRegistry:
     registry = ToolRegistry()
-    registry.register_tool(ToolDefinition(
-        name="echo",
-        description="Echo tool",
-        binary="echo",
-        capabilities=["text"],
-        schemas={
-            "say": ToolSchema(
-                name="say",
-                description="Echo a message",
-                args_template="{{ message }}",
-                parameters={
-                    "type": "object",
-                    "properties": {"message": {"type": "string"}},
-                    "required": ["message"],
-                },
-                output_format="text",
-            ),
-        },
-    ))
+    registry.register_tool(
+        ToolDefinition(
+            name="echo",
+            description="Echo tool",
+            binary="echo",
+            capabilities=["text"],
+            schemas={
+                "say": ToolSchema(
+                    name="say",
+                    description="Echo a message",
+                    args_template="{{ message }}",
+                    parameters={
+                        "type": "object",
+                        "properties": {"message": {"type": "string"}},
+                        "required": ["message"],
+                    },
+                    output_format="text",
+                ),
+            },
+        )
+    )
     return registry
 
 

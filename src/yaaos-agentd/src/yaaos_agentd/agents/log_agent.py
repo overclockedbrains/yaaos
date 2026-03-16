@@ -84,6 +84,7 @@ class LogAgent(BaseAgent):
         """Attempt to connect to journald. Gracefully degrade if unavailable."""
         try:
             from systemd import journal
+
             self._journal_reader = journal.Reader()
             if self._units:
                 for unit in self._units:
@@ -92,7 +93,9 @@ class LogAgent(BaseAgent):
             self._journal_reader.get_previous()
             self._log.info("log_agent.journal_connected", units=self._units)
         except ImportError:
-            self._log.warning("log_agent.journal_unavailable", reason="systemd module not installed")
+            self._log.warning(
+                "log_agent.journal_unavailable", reason="systemd module not installed"
+            )
             self._journal_reader = None
         except Exception as e:
             self._log.warning("log_agent.journal_error", error=str(e))
@@ -111,12 +114,14 @@ class LogAgent(BaseAgent):
                     if isinstance(message, bytes):
                         message = message.decode("utf-8", errors="replace")
 
-                    entries.append({
-                        "unit": unit,
-                        "message": str(message),
-                        "priority": entry.get("PRIORITY", 6),
-                        "timestamp": str(entry.get("__REALTIME_TIMESTAMP", "")),
-                    })
+                    entries.append(
+                        {
+                            "unit": unit,
+                            "message": str(message),
+                            "priority": entry.get("PRIORITY", 6),
+                            "timestamp": str(entry.get("__REALTIME_TIMESTAMP", "")),
+                        }
+                    )
 
                     # Update per-unit stats
                     stats = self._unit_stats.setdefault(unit, UnitStats())
@@ -140,16 +145,18 @@ class LogAgent(BaseAgent):
         for entry in self._entry_buffer:
             for pattern, alert_type in _CRITICAL_PATTERNS:
                 if pattern.search(entry["message"]):
-                    actions.append(Action(
-                        tool="alert",
-                        action="critical",
-                        params={
-                            "unit": entry["unit"],
-                            "alert_type": alert_type,
-                            "message": entry["message"][:500],
-                        },
-                        description=f"Critical: {alert_type} in {entry['unit']}",
-                    ))
+                    actions.append(
+                        Action(
+                            tool="alert",
+                            action="critical",
+                            params={
+                                "unit": entry["unit"],
+                                "alert_type": alert_type,
+                                "message": entry["message"][:500],
+                            },
+                            description=f"Critical: {alert_type} in {entry['unit']}",
+                        )
+                    )
                     break  # One alert per entry
 
         # Tier 2: Statistical rate anomaly detection
@@ -158,17 +165,19 @@ class LogAgent(BaseAgent):
             baseline = self._baseline_rates.get(unit, 0.0)
 
             if baseline > 0 and current_rate > baseline * self._rate_threshold:
-                actions.append(Action(
-                    tool="alert",
-                    action="rate_spike",
-                    params={
-                        "unit": unit,
-                        "current_rate": round(current_rate, 1),
-                        "baseline_rate": round(baseline, 1),
-                        "multiplier": round(current_rate / baseline, 1),
-                    },
-                    description=f"Log rate spike: {unit} at {current_rate:.0f}/min (baseline {baseline:.0f}/min)",
-                ))
+                actions.append(
+                    Action(
+                        tool="alert",
+                        action="rate_spike",
+                        params={
+                            "unit": unit,
+                            "current_rate": round(current_rate, 1),
+                            "baseline_rate": round(baseline, 1),
+                            "multiplier": round(current_rate / baseline, 1),
+                        },
+                        description=f"Log rate spike: {unit} at {current_rate:.0f}/min (baseline {baseline:.0f}/min)",
+                    )
+                )
 
             # Update baseline (exponential moving average)
             if baseline == 0:
@@ -181,14 +190,16 @@ class LogAgent(BaseAgent):
         if self._llm_enabled and self.model_bus and actions:
             anomalous_entries = self._entry_buffer[-50:]  # Last 50 entries
             if anomalous_entries:
-                actions.append(Action(
-                    tool="model_bus",
-                    action="analyze",
-                    params={
-                        "entries": [e["message"] for e in anomalous_entries[:20]],
-                    },
-                    description="LLM analysis of anomalous log batch",
-                ))
+                actions.append(
+                    Action(
+                        tool="model_bus",
+                        action="analyze",
+                        params={
+                            "entries": [e["message"] for e in anomalous_entries[:20]],
+                        },
+                        description="LLM analysis of anomalous log batch",
+                    )
+                )
 
         return actions
 
@@ -206,12 +217,14 @@ class LogAgent(BaseAgent):
                     unit=action.params.get("unit"),
                     message=action.params.get("message", "")[:200],
                 )
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output=f"Alert: {action.description}",
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=True,
+                        output=f"Alert: {action.description}",
+                        duration_ms=(time.monotonic() - start) * 1000,
+                    )
+                )
 
             elif action.tool == "model_bus" and self.model_bus:
                 try:
@@ -229,25 +242,31 @@ class LogAgent(BaseAgent):
                         if "token" in chunk:
                             text_parts.append(chunk["token"])
                     analysis = "".join(text_parts)
-                    results.append(ActionResult(
+                    results.append(
+                        ActionResult(
+                            action=action,
+                            success=True,
+                            output=analysis[:1000],
+                            duration_ms=(time.monotonic() - start) * 1000,
+                        )
+                    )
+                except Exception as e:
+                    results.append(
+                        ActionResult(
+                            action=action,
+                            success=False,
+                            error=str(e),
+                            duration_ms=(time.monotonic() - start) * 1000,
+                        )
+                    )
+            else:
+                results.append(
+                    ActionResult(
                         action=action,
                         success=True,
-                        output=analysis[:1000],
+                        output="No handler",
                         duration_ms=(time.monotonic() - start) * 1000,
-                    ))
-                except Exception as e:
-                    results.append(ActionResult(
-                        action=action,
-                        success=False,
-                        error=str(e),
-                        duration_ms=(time.monotonic() - start) * 1000,
-                    ))
-            else:
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output="No handler",
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                    )
+                )
 
         return results

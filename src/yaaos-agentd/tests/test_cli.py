@@ -56,6 +56,7 @@ class TestStatusCommand:
         runner = CliRunner()
         with patch("yaaos_agentd.cli.AgentBusClient") as MockClient:
             from yaaos_agentd.errors import DaemonNotRunning
+
             MockClient.return_value.health.side_effect = DaemonNotRunning("not running")
             result = runner.invoke(main, ["status"])
             assert result.exit_code == 1
@@ -141,6 +142,7 @@ class TestAgentCommand:
         runner = CliRunner()
         with patch("yaaos_agentd.cli.AgentBusClient") as MockClient:
             from yaaos_agentd.errors import AgentdError
+
             MockClient.return_value.agent_status.side_effect = AgentdError("Agent not found: x")
             result = runner.invoke(main, ["agent", "x"])
             assert result.exit_code == 1
@@ -258,9 +260,7 @@ class TestToolsCommands:
     def test_tools_invoke_bad_param_format(self):
         runner = CliRunner()
         with patch("yaaos_agentd.cli.AgentBusClient"):
-            result = runner.invoke(
-                main, ["tools", "invoke", "echo", "say", "-p", "badparam"]
-            )
+            result = runner.invoke(main, ["tools", "invoke", "echo", "say", "-p", "badparam"])
             assert result.exit_code == 1
             assert "Invalid param format" in result.output
 
@@ -282,6 +282,7 @@ class TestReloadCommand:
         runner = CliRunner()
         with patch("yaaos_agentd.cli.AgentBusClient") as MockClient:
             from yaaos_agentd.errors import DaemonNotRunning
+
             MockClient.return_value.reload_config.side_effect = DaemonNotRunning("not running")
             result = runner.invoke(main, ["reload"])
             assert result.exit_code == 1

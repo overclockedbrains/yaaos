@@ -245,9 +245,7 @@ class TestAgentEndpoints:
         await server.start()
 
         try:
-            resp = await _send_request(
-                config.supervisor.socket_path, "agents.status", {}
-            )
+            resp = await _send_request(config.supervisor.socket_path, "agents.status", {})
             assert "error" in resp
             assert resp["error"]["code"] == -32602  # INVALID_PARAMS
         finally:
@@ -376,9 +374,7 @@ class TestProtocolEdgeCases:
         await server.start()
 
         try:
-            reader, writer = await asyncio.open_unix_connection(
-                str(config.supervisor.socket_path)
-            )
+            reader, writer = await asyncio.open_unix_connection(str(config.supervisor.socket_path))
             writer.write(b"not valid json\n")
             await writer.drain()
 
@@ -399,9 +395,7 @@ class TestProtocolEdgeCases:
         await server.start()
 
         try:
-            resp = await _send_request(
-                config.supervisor.socket_path, "nonexistent.method"
-            )
+            resp = await _send_request(config.supervisor.socket_path, "nonexistent.method")
             assert "error" in resp
             assert resp["error"]["code"] == -32601  # METHOD_NOT_FOUND
         finally:
@@ -415,9 +409,7 @@ class TestProtocolEdgeCases:
         await server.start()
 
         try:
-            reader, writer = await asyncio.open_unix_connection(
-                str(config.supervisor.socket_path)
-            )
+            reader, writer = await asyncio.open_unix_connection(str(config.supervisor.socket_path))
             msg = {"jsonrpc": "2.0", "params": {}, "id": 1}
             writer.write(orjson.dumps(msg) + b"\n")
             await writer.drain()
@@ -455,9 +447,7 @@ class TestProtocolEdgeCases:
         await server.start()
 
         try:
-            reader, writer = await asyncio.open_unix_connection(
-                str(config.supervisor.socket_path)
-            )
+            reader, writer = await asyncio.open_unix_connection(str(config.supervisor.socket_path))
 
             for i in range(3):
                 msg = {

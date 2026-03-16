@@ -128,6 +128,7 @@ class ResourceAgent(BaseAgent):
         if self._gpu_enabled:
             try:
                 import pynvml
+
                 pynvml.nvmlInit()
                 handle = pynvml.nvmlDeviceGetHandleByIndex(0)
                 util = pynvml.nvmlDeviceGetUtilizationRates(handle)
@@ -176,69 +177,79 @@ class ResourceAgent(BaseAgent):
             if self._sustained_cpu_start is None:
                 self._sustained_cpu_start = now
             elif now - self._sustained_cpu_start > 60:
-                actions.append(Action(
-                    tool="alert",
-                    action="cpu_high",
-                    params={"cpu_percent": cpu, "sustained_sec": round(now - self._sustained_cpu_start)},
-                    description=f"CPU sustained at {cpu:.0f}% for {now - self._sustained_cpu_start:.0f}s",
-                ))
+                actions.append(
+                    Action(
+                        tool="alert",
+                        action="cpu_high",
+                        params={
+                            "cpu_percent": cpu,
+                            "sustained_sec": round(now - self._sustained_cpu_start),
+                        },
+                        description=f"CPU sustained at {cpu:.0f}% for {now - self._sustained_cpu_start:.0f}s",
+                    )
+                )
         else:
             self._sustained_cpu_start = None
 
         # Memory thresholds
         if mem_pct >= self._memory_critical_pct:
-            actions.append(Action(
-                tool="alert",
-                action="memory_critical",
-                params={
-                    "memory_percent": mem_pct,
-                    "available_mb": observation.get("memory_available_mb", 0),
-                },
-                description=f"Critical: memory at {mem_pct:.0f}%",
-            ))
+            actions.append(
+                Action(
+                    tool="alert",
+                    action="memory_critical",
+                    params={
+                        "memory_percent": mem_pct,
+                        "available_mb": observation.get("memory_available_mb", 0),
+                    },
+                    description=f"Critical: memory at {mem_pct:.0f}%",
+                )
+            )
         elif mem_pct >= self._memory_warn_pct:
-            actions.append(Action(
-                tool="alert",
-                action="memory_warning",
-                params={"memory_percent": mem_pct},
-                description=f"Warning: memory at {mem_pct:.0f}%",
-            ))
+            actions.append(
+                Action(
+                    tool="alert",
+                    action="memory_warning",
+                    params={"memory_percent": mem_pct},
+                    description=f"Warning: memory at {mem_pct:.0f}%",
+                )
+            )
 
         # ── Tier 2: Trend prediction ────────────────────────────
 
-        time_to_critical = self._memory_trend.predict_time_to_threshold(
-            self._memory_critical_pct
-        )
-        if (
-            time_to_critical is not None
-            and 0 < time_to_critical < self._prediction_window_sec
-        ):
-            actions.append(Action(
-                tool="alert",
-                action="memory_predicted",
-                params={
-                    "predicted_sec": round(time_to_critical),
-                    "current_percent": mem_pct,
-                    "trend_ewma": round(self._memory_trend.ewma, 1),
-                },
-                description=f"Memory exhaustion predicted in {time_to_critical:.0f}s",
-            ))
+        time_to_critical = self._memory_trend.predict_time_to_threshold(self._memory_critical_pct)
+        if time_to_critical is not None and 0 < time_to_critical < self._prediction_window_sec:
+            actions.append(
+                Action(
+                    tool="alert",
+                    action="memory_predicted",
+                    params={
+                        "predicted_sec": round(time_to_critical),
+                        "current_percent": mem_pct,
+                        "trend_ewma": round(self._memory_trend.ewma, 1),
+                    },
+                    description=f"Memory exhaustion predicted in {time_to_critical:.0f}s",
+                )
+            )
 
         # ── Tier 3: LLM analysis on critical ────────────────────
 
         if self._llm_enabled and self.model_bus:
-            critical_actions = [a for a in actions if "critical" in a.action or "predicted" in a.action]
+            critical_actions = [
+                a for a in actions if "critical" in a.action or "predicted" in a.action
+            ]
             if critical_actions:
-                actions.append(Action(
-                    tool="model_bus",
-                    action="analyze_resources",
-                    params={
-                        "cpu_percent": cpu,
-                        "memory_percent": mem_pct,
-                        "alerts": [a.description for a in critical_actions],
-                    },
-                    description="LLM resource analysis",
-                ))
+                actions.append(
+                    Action(
+                        tool="model_bus",
+                        action="analyze_resources",
+                        params={
+                            "cpu_percent": cpu,
+                            "memory_percent": mem_pct,
+                            "alerts": [a.description for a in critical_actions],
+                        },
+                        description="LLM resource analysis",
+                    )
+                )
 
         return actions
 
@@ -255,12 +266,14 @@ class ResourceAgent(BaseAgent):
                     f"resource_agent.{action.action}",
                     **{k: v for k, v in action.params.items() if isinstance(v, (int, float, str))},
                 )
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output=action.description,
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=True,
+                        output=action.description,
+                        duration_ms=(time.monotonic() - start) * 1000,
+                    )
+                )
 
             elif action.tool == "model_bus" and self.model_bus:
                 try:
@@ -281,25 +294,31 @@ class ResourceAgent(BaseAgent):
                         if "token" in chunk:
                             text_parts.append(chunk["token"])
                     analysis = "".join(text_parts)
-                    results.append(ActionResult(
+                    results.append(
+                        ActionResult(
+                            action=action,
+                            success=True,
+                            output=analysis[:1000],
+                            duration_ms=(time.monotonic() - start) * 1000,
+                        )
+                    )
+                except Exception as e:
+                    results.append(
+                        ActionResult(
+                            action=action,
+                            success=False,
+                            error=str(e),
+                            duration_ms=(time.monotonic() - start) * 1000,
+                        )
+                    )
+            else:
+                results.append(
+                    ActionResult(
                         action=action,
                         success=True,
-                        output=analysis[:1000],
+                        output="No handler",
                         duration_ms=(time.monotonic() - start) * 1000,
-                    ))
-                except Exception as e:
-                    results.append(ActionResult(
-                        action=action,
-                        success=False,
-                        error=str(e),
-                        duration_ms=(time.monotonic() - start) * 1000,
-                    ))
-            else:
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output="No handler",
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                    )
+                )
 
         return results

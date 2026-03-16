@@ -15,10 +15,10 @@ from enum import Enum
 class SandboxTier(Enum):
     """Sandbox isolation levels for tools."""
 
-    NONE = "none"               # Trusted system tools (systemctl, journalctl)
-    READ_ONLY = "read-only"     # Read-only tools (git status, docker ps)
+    NONE = "none"  # Trusted system tools (systemctl, journalctl)
+    READ_ONLY = "read-only"  # Read-only tools (git status, docker ps)
     NETWORK_ISOLATED = "network-isolated"  # Build tools, no network
-    FULL = "full"               # Untrusted tools, maximum isolation
+    FULL = "full"  # Untrusted tools, maximum isolation
 
 
 @dataclass

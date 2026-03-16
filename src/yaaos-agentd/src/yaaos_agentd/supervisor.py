@@ -51,6 +51,7 @@ def _sample_process_metrics() -> tuple[int | None, float | None, float | None]:
     if _psutil_available is None:
         try:
             import psutil
+
             _psutil_process = psutil.Process(os.getpid())
             _psutil_process.cpu_percent()  # Prime — first call always returns 0.0
             _psutil_available = True
@@ -196,11 +197,7 @@ class Supervisor:
 
         This is the core of the supervisor — runs every reconcile_interval_sec.
         """
-        desired = {
-            name: spec
-            for name, spec in self._config.agents.items()
-            if spec.enabled
-        }
+        desired = {name: spec for name, spec in self._config.agents.items() if spec.enabled}
         actual = dict(self._handles)
 
         # Start agents that should be running but aren't
@@ -271,9 +268,7 @@ class Supervisor:
             handle.status.last_error = str(e)
             self._handles[name] = handle
 
-    async def _run_agent_supervised(
-        self, name: str, agent: BaseAgent, handle: AgentHandle
-    ) -> None:
+    async def _run_agent_supervised(self, name: str, agent: BaseAgent, handle: AgentHandle) -> None:
         """Run an agent with supervision — tracks exit reason."""
         try:
             await agent.run_loop()
@@ -342,7 +337,7 @@ class Supervisor:
         if name not in self._agent_start_order:
             return []
         idx = self._agent_start_order.index(name)
-        return self._agent_start_order[idx + 1:]
+        return self._agent_start_order[idx + 1 :]
 
     async def _stop_agents_after(self, name: str) -> None:
         """rest_for_one phase 1: stop all agents started after the given agent.
@@ -414,11 +409,13 @@ class Supervisor:
         spec = self._config.agents.get(name)
         if spec is None:
             from yaaos_agentd.errors import AgentNotFoundError
+
             raise AgentNotFoundError(name)
 
         handle = self._handles.get(name)
         if handle and handle.is_running:
             from yaaos_agentd.errors import AgentAlreadyRunningError
+
             raise AgentAlreadyRunningError(name)
 
         # Reset limiter on manual start
@@ -431,6 +428,7 @@ class Supervisor:
         """Manually stop an agent by name."""
         if name not in self._handles:
             from yaaos_agentd.errors import AgentNotFoundError
+
             raise AgentNotFoundError(name)
         await self._stop_agent(name)
 
@@ -444,6 +442,7 @@ class Supervisor:
         spec = self._config.agents.get(name)
         if spec is None:
             from yaaos_agentd.errors import AgentNotFoundError
+
             raise AgentNotFoundError(name)
         await self._start_agent(name, spec)
 
@@ -475,8 +474,7 @@ class Supervisor:
         statuses = self.get_all_statuses()
         running = sum(1 for s in statuses.values() if s.state == AgentState.RUNNING)
         failed = sum(
-            1 for s in statuses.values()
-            if s.state in (AgentState.FAILED, AgentState.CRASH_LOOP)
+            1 for s in statuses.values() if s.state in (AgentState.FAILED, AgentState.CRASH_LOOP)
         )
         degraded = sum(1 for s in statuses.values() if s.state == AgentState.DEGRADED)
         total_cycles = sum(s.cycle_count for s in statuses.values())
@@ -549,6 +547,7 @@ class Supervisor:
 def _running_under_systemd() -> bool:
     """Check if we're running as a systemd Type=notify service."""
     import os
+
     return bool(os.environ.get("NOTIFY_SOCKET"))
 
 
@@ -561,6 +560,7 @@ def _sd_notify(msg: str) -> None:
     """
     try:
         import sdnotify
+
         sdnotify.SystemdNotifier().notify(msg)
     except ImportError:
         if _running_under_systemd():
@@ -595,10 +595,12 @@ async def run_daemon(config: Config, *, config_path: Path | None = None) -> None
 
     # Initialize Tool Registry
     from yaaos_agentd.tools.registry import ToolRegistry
+
     registry = ToolRegistry(config.tool_dirs)
 
     # Start Agent Bus JSON-RPC server
     from yaaos_agentd.server import AgentBusServer
+
     bus_server = AgentBusServer(
         config.supervisor.socket_path,
         supervisor,
@@ -626,6 +628,7 @@ async def run_daemon(config: Config, *, config_path: Path | None = None) -> None
 
     # Start watchdog pinger if WATCHDOG_USEC is set
     import os
+
     watchdog_task = None
     watchdog_usec = int(os.environ.get("WATCHDOG_USEC", 0))
     if watchdog_usec > 0:
@@ -703,6 +706,7 @@ def main() -> None:
     """CLI entry point for systemagentd."""
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass

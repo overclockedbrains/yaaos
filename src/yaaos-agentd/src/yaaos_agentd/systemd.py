@@ -20,9 +20,9 @@ class UnitStatus:
     """Status snapshot of a systemd unit."""
 
     name: str
-    load_state: str       # "loaded", "not-found", "masked"
-    active_state: str     # "active", "inactive", "failed", "activating"
-    sub_state: str        # "running", "dead", "failed", "exited"
+    load_state: str  # "loaded", "not-found", "masked"
+    active_state: str  # "active", "inactive", "failed", "activating"
+    sub_state: str  # "running", "dead", "failed", "exited"
     description: str = ""
     main_pid: int = 0
     memory_bytes: int = 0
@@ -71,6 +71,7 @@ class SystemdManager:
         """Connect to the system D-Bus."""
         try:
             from dbus_next.aio import MessageBus
+
             self._bus = await MessageBus(bus_type=_bus_type()).connect()
             introspection = await self._bus.introspect(
                 "org.freedesktop.systemd1",
@@ -145,9 +146,7 @@ class SystemdManager:
         memory_bytes = 0
         try:
             main_pid = await props.call_get("org.freedesktop.systemd1.Service", "MainPID")
-            memory_bytes = await props.call_get(
-                "org.freedesktop.systemd1.Service", "MemoryCurrent"
-            )
+            memory_bytes = await props.call_get("org.freedesktop.systemd1.Service", "MemoryCurrent")
         except Exception:
             pass
 
@@ -176,4 +175,5 @@ def _variant_value(variant: Any) -> Any:
 def _bus_type():
     """Get the dbus-next BusType for system bus."""
     from dbus_next import BusType
+
     return BusType.SYSTEM

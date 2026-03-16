@@ -198,7 +198,8 @@ class TestFsAgentAct:
         agent._systemd = None
 
         action = Action(
-            tool="systemd", action="restart",
+            tool="systemd",
+            action="restart",
             params={"unit": "yaaos-sfs.service"},
             description="Restart SFS",
         )
@@ -215,7 +216,8 @@ class TestFsAgentAct:
         agent._systemd.start_unit = AsyncMock()
 
         action = Action(
-            tool="systemd", action="start",
+            tool="systemd",
+            action="start",
             params={"unit": "yaaos-sfs.service"},
         )
         results = await agent.act([action])
@@ -231,7 +233,8 @@ class TestFsAgentAct:
         agent._systemd.restart_unit = AsyncMock()
 
         action = Action(
-            tool="systemd", action="restart",
+            tool="systemd",
+            action="restart",
             params={"unit": "yaaos-sfs.service"},
         )
         results = await agent.act([action])
@@ -246,7 +249,8 @@ class TestFsAgentAct:
         agent._systemd.stop_unit = AsyncMock()
 
         action = Action(
-            tool="systemd", action="stop",
+            tool="systemd",
+            action="stop",
             params={"unit": "yaaos-sfs.service"},
         )
         results = await agent.act([action])
@@ -262,7 +266,8 @@ class TestFsAgentAct:
         agent._systemd.restart_unit = AsyncMock(side_effect=Exception("Unit not found"))
 
         action = Action(
-            tool="systemd", action="restart",
+            tool="systemd",
+            action="restart",
             params={"unit": "yaaos-sfs.service"},
         )
         results = await agent.act([action])

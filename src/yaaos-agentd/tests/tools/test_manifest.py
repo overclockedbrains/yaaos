@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from yaaos_agentd.tools.manifest import (
     ToolDefinition,
     ToolSchema,

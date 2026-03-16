@@ -182,8 +182,16 @@ class TestSyncClient:
         client = AgentBusClient("/tmp/fake.sock")
         # Check all public methods exist and are callable
         for method in [
-            "ping", "health", "list_agents", "agent_status",
-            "start_agent", "stop_agent", "restart_agent",
-            "list_tools", "tool_schema", "invoke_tool", "reload_config",
+            "ping",
+            "health",
+            "list_agents",
+            "agent_status",
+            "start_agent",
+            "stop_agent",
+            "restart_agent",
+            "list_tools",
+            "tool_schema",
+            "invoke_tool",
+            "reload_config",
         ]:
             assert callable(getattr(client, method))

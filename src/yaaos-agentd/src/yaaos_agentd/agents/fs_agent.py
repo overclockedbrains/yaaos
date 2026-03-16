@@ -75,7 +75,9 @@ class FsAgent(BaseAgent):
         if observation.get("status") == "error":
             self._consecutive_failures += 1
             if self._consecutive_failures >= 3:
-                self._log.warning("fs_agent.persistent_dbus_error", failures=self._consecutive_failures)
+                self._log.warning(
+                    "fs_agent.persistent_dbus_error", failures=self._consecutive_failures
+                )
             return []
 
         self._consecutive_failures = 0
@@ -83,21 +85,25 @@ class FsAgent(BaseAgent):
 
         if active_state == "failed":
             self._log.warning("fs_agent.sfs_failed", unit=self._unit_name)
-            return [Action(
-                tool="systemd",
-                action="restart",
-                params={"unit": self._unit_name},
-                description=f"Restart failed SFS service {self._unit_name}",
-            )]
+            return [
+                Action(
+                    tool="systemd",
+                    action="restart",
+                    params={"unit": self._unit_name},
+                    description=f"Restart failed SFS service {self._unit_name}",
+                )
+            ]
 
         if active_state == "inactive":
             self._log.info("fs_agent.sfs_inactive", unit=self._unit_name)
-            return [Action(
-                tool="systemd",
-                action="start",
-                params={"unit": self._unit_name},
-                description=f"Start inactive SFS service {self._unit_name}",
-            )]
+            return [
+                Action(
+                    tool="systemd",
+                    action="start",
+                    params={"unit": self._unit_name},
+                    description=f"Start inactive SFS service {self._unit_name}",
+                )
+            ]
 
         return []
 
@@ -106,11 +112,13 @@ class FsAgent(BaseAgent):
         results = []
         for action in actions:
             if not self._systemd or not self._systemd.is_connected:
-                results.append(ActionResult(
-                    action=action,
-                    success=False,
-                    error="D-Bus not connected",
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=False,
+                        error="D-Bus not connected",
+                    )
+                )
                 continue
 
             try:
@@ -122,17 +130,21 @@ class FsAgent(BaseAgent):
                 elif action.action == "stop":
                     await self._systemd.stop_unit(unit)
 
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output=f"{action.action} {unit} succeeded",
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=True,
+                        output=f"{action.action} {unit} succeeded",
+                    )
+                )
             except Exception as e:
                 self._log.error("fs_agent.action_failed", action=action.action, error=str(e))
-                results.append(ActionResult(
-                    action=action,
-                    success=False,
-                    error=str(e),
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=False,
+                        error=str(e),
+                    )
+                )
 
         return results

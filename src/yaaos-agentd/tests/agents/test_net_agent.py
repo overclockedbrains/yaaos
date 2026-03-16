@@ -66,8 +66,10 @@ class TestNetAgentObserve:
                 return _MOCK_PROC_NET_TCP
             return original_read_text(self, *args, **kwargs)
 
-        with patch.object(Path, "exists", mock_exists), \
-             patch.object(Path, "read_text", mock_read_text):
+        with (
+            patch.object(Path, "exists", mock_exists),
+            patch.object(Path, "read_text", mock_read_text),
+        ):
             obs = await agent.observe()
 
         assert obs["established"] == 2
@@ -92,7 +94,13 @@ class TestNetAgentReason:
     async def test_no_alerts_first_cycle(self):
         """First cycle establishes baseline — no alerts."""
         agent = NetAgent(_net_spec())
-        obs = {"established": 10, "listening": 2, "time_wait": 1, "total": 13, "listening_ports": [22, 80]}
+        obs = {
+            "established": 10,
+            "listening": 2,
+            "time_wait": 1,
+            "total": 13,
+            "listening_ports": [22, 80],
+        }
         actions = await agent.reason(obs)
         # First cycle: no alerts (establishing baseline)
         new_listener_alerts = [a for a in actions if a.action == "new_listener"]
@@ -104,11 +112,23 @@ class TestNetAgentReason:
         agent = NetAgent(_net_spec(config={"expected_ports": [22, 80], "rate_threshold": 2.0}))
 
         # First cycle: establish baseline
-        obs1 = {"established": 10, "listening": 2, "time_wait": 0, "total": 12, "listening_ports": [22, 80]}
+        obs1 = {
+            "established": 10,
+            "listening": 2,
+            "time_wait": 0,
+            "total": 12,
+            "listening_ports": [22, 80],
+        }
         await agent.reason(obs1)
 
         # Second cycle: new port appears
-        obs2 = {"established": 10, "listening": 3, "time_wait": 0, "total": 13, "listening_ports": [22, 80, 4444]}
+        obs2 = {
+            "established": 10,
+            "listening": 3,
+            "time_wait": 0,
+            "total": 13,
+            "listening_ports": [22, 80, 4444],
+        }
         actions = await agent.reason(obs2)
         new_listener = [a for a in actions if a.action == "new_listener"]
         assert len(new_listener) == 1
@@ -119,10 +139,22 @@ class TestNetAgentReason:
         """Expected ports don't trigger alerts."""
         agent = NetAgent(_net_spec(config={"expected_ports": [22, 80, 443], "rate_threshold": 2.0}))
 
-        obs1 = {"established": 10, "listening": 1, "time_wait": 0, "total": 11, "listening_ports": [22]}
+        obs1 = {
+            "established": 10,
+            "listening": 1,
+            "time_wait": 0,
+            "total": 11,
+            "listening_ports": [22],
+        }
         await agent.reason(obs1)
 
-        obs2 = {"established": 10, "listening": 2, "time_wait": 0, "total": 12, "listening_ports": [22, 443]}
+        obs2 = {
+            "established": 10,
+            "listening": 2,
+            "time_wait": 0,
+            "total": 12,
+            "listening_ports": [22, 443],
+        }
         actions = await agent.reason(obs2)
         new_listener = [a for a in actions if a.action == "new_listener"]
         assert len(new_listener) == 0
@@ -134,7 +166,13 @@ class TestNetAgentReason:
         agent._baseline_rate = 10.0
         agent._first_cycle = False
 
-        obs = {"established": 25, "listening": 1, "time_wait": 0, "total": 26, "listening_ports": [22]}
+        obs = {
+            "established": 25,
+            "listening": 1,
+            "time_wait": 0,
+            "total": 26,
+            "listening_ports": [22],
+        }
         actions = await agent.reason(obs)
         spikes = [a for a in actions if a.action == "connection_spike"]
         assert len(spikes) == 1
@@ -147,7 +185,13 @@ class TestNetAgentReason:
         agent._baseline_rate = 10.0
         agent._first_cycle = False
 
-        obs = {"established": 15, "listening": 1, "time_wait": 0, "total": 16, "listening_ports": [22]}
+        obs = {
+            "established": 15,
+            "listening": 1,
+            "time_wait": 0,
+            "total": 16,
+            "listening_ports": [22],
+        }
         actions = await agent.reason(obs)
         spikes = [a for a in actions if a.action == "connection_spike"]
         assert len(spikes) == 0
@@ -157,6 +201,7 @@ class TestNetAgentAct:
     @pytest.mark.asyncio
     async def test_alert_action(self):
         from yaaos_agentd.types import Action
+
         agent = NetAgent(_net_spec())
         actions = [
             Action(
@@ -172,15 +217,25 @@ class TestNetAgentAct:
 
     @pytest.mark.asyncio
     async def test_llm_not_triggered_without_flag(self):
-        agent = NetAgent(_net_spec(config={
-            "llm_enabled": False,
-            "rate_threshold": 2.0,
-            "expected_ports": [],
-        }))
+        agent = NetAgent(
+            _net_spec(
+                config={
+                    "llm_enabled": False,
+                    "rate_threshold": 2.0,
+                    "expected_ports": [],
+                }
+            )
+        )
         agent._baseline_rate = 10.0
         agent._first_cycle = False
         agent._known_listeners = {22}
 
-        obs = {"established": 100, "listening": 2, "time_wait": 0, "total": 102, "listening_ports": [22, 9999]}
+        obs = {
+            "established": 100,
+            "listening": 2,
+            "time_wait": 0,
+            "total": 102,
+            "listening_ports": [22, 9999],
+        }
         actions = await agent.reason(obs)
         assert not any(a.tool == "model_bus" for a in actions)

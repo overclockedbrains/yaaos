@@ -15,14 +15,14 @@ class AgentState(Enum):
     and Erlang/OTP child process states.
     """
 
-    SPEC_ONLY = "spec_only"      # Config loaded, not started
-    STARTING = "starting"         # Process starting, waiting for READY
-    RUNNING = "running"           # Healthy, passing health checks
-    DEGRADED = "degraded"         # Running but health checks failing
-    STOPPING = "stopping"         # Graceful shutdown in progress
-    STOPPED = "stopped"           # Clean exit
-    FAILED = "failed"             # Crashed, eligible for restart
-    CRASH_LOOP = "crash_loop"     # Exceeded restart intensity, needs manual intervention
+    SPEC_ONLY = "spec_only"  # Config loaded, not started
+    STARTING = "starting"  # Process starting, waiting for READY
+    RUNNING = "running"  # Healthy, passing health checks
+    DEGRADED = "degraded"  # Running but health checks failing
+    STOPPING = "stopping"  # Graceful shutdown in progress
+    STOPPED = "stopped"  # Clean exit
+    FAILED = "failed"  # Crashed, eligible for restart
+    CRASH_LOOP = "crash_loop"  # Exceeded restart intensity, needs manual intervention
 
 
 class RestartStrategy(Enum):
@@ -57,14 +57,14 @@ class AgentSpec:
     """
 
     name: str
-    module: str                                     # e.g. "yaaos_agentd.agents.log_agent"
+    module: str  # e.g. "yaaos_agentd.agents.log_agent"
     enabled: bool = True
     restart_policy: RestartPolicy = RestartPolicy.PERMANENT
     reconcile_interval_sec: float = 30.0
     max_restarts: int = 5
     max_restart_window_sec: float = 60.0
     resource_limits: dict[str, Any] = field(default_factory=dict)  # CPUQuota, MemoryMax
-    config: dict[str, Any] = field(default_factory=dict)           # Agent-specific config
+    config: dict[str, Any] = field(default_factory=dict)  # Agent-specific config
 
     def to_dict(self) -> dict:
         return {
@@ -125,8 +125,8 @@ class AgentStatus:
 class Action:
     """A planned action from an agent's reason() phase."""
 
-    tool: str           # Tool name from registry, or built-in action
-    action: str         # Specific action (e.g. "ps", "status", "alert")
+    tool: str  # Tool name from registry, or built-in action
+    action: str  # Specific action (e.g. "ps", "status", "alert")
     params: dict[str, Any] = field(default_factory=dict)
     description: str = ""
 

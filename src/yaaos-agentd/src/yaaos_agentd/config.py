@@ -90,13 +90,9 @@ class Config:
             reconcile_interval_sec=sup_raw.get("reconcile_interval_sec", 10.0),
             max_restarts=sup_raw.get("max_restarts", 5),
             max_restart_window_sec=sup_raw.get("max_restart_window_sec", 60.0),
-            log_level=os.environ.get(
-                "YAAOS_AGENTD_LOG_LEVEL", sup_raw.get("log_level", "info")
-            ),
+            log_level=os.environ.get("YAAOS_AGENTD_LOG_LEVEL", sup_raw.get("log_level", "info")),
             max_connections=sup_raw.get("max_connections", 8),
-            restart_strategy=RestartStrategy(
-                sup_raw.get("restart_strategy", "one_for_one")
-            ),
+            restart_strategy=RestartStrategy(sup_raw.get("restart_strategy", "one_for_one")),
             allow_root_tools=sup_raw.get("allow_root_tools", False),
         )
 
@@ -153,13 +149,9 @@ def _parse_agent_spec(name: str, raw: dict, supervisor: SupervisorConfig) -> Age
         module=raw.get("module", f"yaaos_agentd.agents.{name}_agent"),
         enabled=raw.get("enabled", True),
         restart_policy=restart_policy,
-        reconcile_interval_sec=raw.get(
-            "reconcile_interval_sec", supervisor.reconcile_interval_sec
-        ),
+        reconcile_interval_sec=raw.get("reconcile_interval_sec", supervisor.reconcile_interval_sec),
         max_restarts=raw.get("max_restarts", supervisor.max_restarts),
-        max_restart_window_sec=raw.get(
-            "max_restart_window_sec", supervisor.max_restart_window_sec
-        ),
+        max_restart_window_sec=raw.get("max_restart_window_sec", supervisor.max_restart_window_sec),
         resource_limits={
             k: v
             for k, v in raw.items()

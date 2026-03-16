@@ -36,7 +36,10 @@ class CrashAgent(BaseAgent):
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                "coredumpctl", "list", "--json=short", "--no-pager",
+                "coredumpctl",
+                "list",
+                "--json=short",
+                "--no-pager",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -59,7 +62,7 @@ class CrashAgent(BaseAgent):
 
         # Filter out already-analyzed dumps
         new_dumps = []
-        for dump in dumps[-self._max_dumps:]:
+        for dump in dumps[-self._max_dumps :]:
             dump_id = f"{dump.get('pid', '')}-{dump.get('timestamp', '')}"
             if dump_id not in self._analyzed:
                 new_dumps.append(dump)
@@ -79,17 +82,19 @@ class CrashAgent(BaseAgent):
             signal = dump.get("sig", "unknown")
             pid = dump.get("pid", "unknown")
 
-            actions.append(Action(
-                tool="coredumpctl",
-                action="backtrace",
-                params={
-                    "pid": str(pid),
-                    "exe": exe,
-                    "signal": str(signal),
-                    "timestamp": dump.get("timestamp", ""),
-                },
-                description=f"Analyze crash: {exe} (PID {pid}, signal {signal})",
-            ))
+            actions.append(
+                Action(
+                    tool="coredumpctl",
+                    action="backtrace",
+                    params={
+                        "pid": str(pid),
+                        "exe": exe,
+                        "signal": str(signal),
+                        "timestamp": dump.get("timestamp", ""),
+                    },
+                    description=f"Analyze crash: {exe} (PID {pid}, signal {signal})",
+                )
+            )
 
         return actions
 
@@ -132,24 +137,29 @@ class CrashAgent(BaseAgent):
 
                 self._log.info(
                     "crash_agent.analyzed",
-                    exe=exe, pid=pid,
+                    exe=exe,
+                    pid=pid,
                     has_backtrace=bool(backtrace),
                 )
 
-                results.append(ActionResult(
-                    action=action,
-                    success=True,
-                    output=analysis[:2000],
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=True,
+                        output=analysis[:2000],
+                        duration_ms=(time.monotonic() - start) * 1000,
+                    )
+                )
 
             except Exception as e:
-                results.append(ActionResult(
-                    action=action,
-                    success=False,
-                    error=str(e),
-                    duration_ms=(time.monotonic() - start) * 1000,
-                ))
+                results.append(
+                    ActionResult(
+                        action=action,
+                        success=False,
+                        error=str(e),
+                        duration_ms=(time.monotonic() - start) * 1000,
+                    )
+                )
 
         return results
 
@@ -157,7 +167,9 @@ class CrashAgent(BaseAgent):
         """Extract backtrace from a core dump using coredumpctl."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "coredumpctl", "debug", str(pid),
+                "coredumpctl",
+                "debug",
+                str(pid),
                 "--debugger-arguments=-batch -ex bt -ex quit",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

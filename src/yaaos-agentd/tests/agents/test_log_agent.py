@@ -137,6 +137,7 @@ class TestLogAgentAct:
     @pytest.mark.asyncio
     async def test_alert_action(self):
         from yaaos_agentd.types import Action
+
         agent = LogAgent(_log_spec())
         actions = [
             Action(

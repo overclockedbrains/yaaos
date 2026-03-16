@@ -67,11 +67,7 @@ def load_agent_class(spec: AgentSpec):
 
     for attr_name in dir(module):
         attr = getattr(module, attr_name)
-        if (
-            isinstance(attr, type)
-            and issubclass(attr, BaseAgent)
-            and attr is not BaseAgent
-        ):
+        if isinstance(attr, type) and issubclass(attr, BaseAgent) and attr is not BaseAgent:
             return attr
 
     raise ImportError(
@@ -84,6 +80,7 @@ def _create_model_bus_client():
     """Try to create a Model Bus async client. Returns None if unavailable."""
     try:
         from yaaos_modelbus.client import AsyncModelBusClient
+
         return AsyncModelBusClient()
     except Exception:
         logger.info("agent_runner.model_bus_unavailable")

@@ -78,8 +78,10 @@ class TestResourceAgentObserve:
         mock_mem.available = 8 * 1024 * 1024 * 1024  # 8 GB
         mock_mem.total = 32 * 1024 * 1024 * 1024  # 32 GB
 
-        with patch("psutil.cpu_percent", return_value=25.0), \
-             patch("psutil.virtual_memory", return_value=mock_mem):
+        with (
+            patch("psutil.cpu_percent", return_value=25.0),
+            patch("psutil.virtual_memory", return_value=mock_mem),
+        ):
             obs = await agent.observe()
             assert obs["cpu_percent"] == 25.0
             assert obs["memory_percent"] == 65.0
@@ -92,7 +94,10 @@ class TestResourceAgentObserve:
 
         # Remove psutil from sys.modules cache so the lazy import fails
         import sys as _sys
-        original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+
+        original_import = (
+            __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+        )
         real_psutil = _sys.modules.get("psutil")
 
         def mock_import(name, *args, **kwargs):
@@ -160,11 +165,15 @@ class TestResourceAgentReason:
     @pytest.mark.asyncio
     async def test_memory_prediction_alert(self):
         """Memory trend prediction fires when exhaustion is imminent."""
-        agent = ResourceAgent(_resource_spec(config={
-            "memory_critical_pct": 90.0,
-            "prediction_window_sec": 300.0,
-            "gpu_enabled": False,
-        }))
+        agent = ResourceAgent(
+            _resource_spec(
+                config={
+                    "memory_critical_pct": 90.0,
+                    "prediction_window_sec": 300.0,
+                    "gpu_enabled": False,
+                }
+            )
+        )
         # Seed the trend with rising memory usage
         base = time.monotonic()
         for i in range(30):
@@ -177,11 +186,15 @@ class TestResourceAgentReason:
 
     @pytest.mark.asyncio
     async def test_llm_not_triggered_without_flag(self):
-        agent = ResourceAgent(_resource_spec(config={
-            "llm_enabled": False,
-            "memory_critical_pct": 90.0,
-            "gpu_enabled": False,
-        }))
+        agent = ResourceAgent(
+            _resource_spec(
+                config={
+                    "llm_enabled": False,
+                    "memory_critical_pct": 90.0,
+                    "gpu_enabled": False,
+                }
+            )
+        )
         obs = {"cpu_percent": 30.0, "memory_percent": 95.0, "memory_available_mb": 500}
         actions = await agent.reason(obs)
         assert not any(a.tool == "model_bus" for a in actions)
@@ -191,6 +204,7 @@ class TestResourceAgentAct:
     @pytest.mark.asyncio
     async def test_alert_action(self):
         from yaaos_agentd.types import Action
+
         agent = ResourceAgent(_resource_spec())
         actions = [
             Action(
