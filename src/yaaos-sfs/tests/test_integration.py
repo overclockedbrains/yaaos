@@ -1,4 +1,10 @@
-"""Integration tests — end-to-end indexing and search."""
+"""Integration tests — end-to-end indexing and search.
+
+These tests use a real embedding model (all-MiniLM-L6-v2) for realistic
+semantic search validation. The module is skipped automatically if the
+model cannot be loaded (e.g., no network on first run, missing
+sentence-transformers).
+"""
 
 from __future__ import annotations
 
@@ -8,14 +14,26 @@ from yaaos_sfs.config import Config
 from yaaos_sfs.db import Database
 from yaaos_sfs.extractors import extract_text
 from yaaos_sfs.chunkers import chunk_text
-from yaaos_sfs.providers.local import LocalEmbeddingProvider
 from yaaos_sfs.search import hybrid_search
+
+_load_err = None
+_provider = None
+try:
+    from yaaos_sfs.providers.local import LocalEmbeddingProvider
+    _provider = LocalEmbeddingProvider("all-MiniLM-L6-v2")
+except Exception as exc:
+    _load_err = exc
+
+pytestmark = pytest.mark.skipif(
+    _provider is None,
+    reason=f"Embedding model unavailable: {_load_err}",
+)
 
 
 @pytest.fixture(scope="module")
 def provider():
-    """Shared provider to avoid reloading model per test."""
-    return LocalEmbeddingProvider("all-MiniLM-L6-v2")
+    """Shared provider — loaded once at module import time."""
+    return _provider
 
 
 @pytest.fixture
